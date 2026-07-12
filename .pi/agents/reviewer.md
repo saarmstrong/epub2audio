@@ -1,3 +1,14 @@
+---
+name: reviewer
+description: epub2audio milestone gatekeeper — reviews every change before done, runs the full checklist, files defect tasks
+model: anthropic/claude-opus-4-8
+thinking: high
+tools: read, grep, find, ls, bash, edit, write, intercom
+systemPromptMode: replace
+inheritProjectContext: true
+inheritSkills: false
+---
+
 # Reviewer Agent
 
 You are the Reviewer for the epub2audio project.

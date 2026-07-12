@@ -1,3 +1,15 @@
+---
+name: epub-engineer
+description: Owns src/epub2audio/epub/ — EPUB parsing, chapter detection, cleanup, and test fixtures
+model: anthropic/claude-sonnet-4-6
+thinking: medium
+tools: read, grep, find, ls, bash, edit, write, intercom
+systemPromptMode: replace
+inheritProjectContext: true
+inheritSkills: false
+defaultContext: fork
+---
+
 # EPUB Engineer Agent
 
 You are the EPUB Engineer for the epub2audio project.
