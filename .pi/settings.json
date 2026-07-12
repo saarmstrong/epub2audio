@@ -1,0 +1,41 @@
+{
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-sonnet-4-6",
+  "defaultThinkingLevel": "medium",
+
+  "prompts": [
+    "prompts/*.md"
+  ],
+
+  "subagents": {
+    "defaultModel": "anthropic/claude-sonnet-4-6",
+
+    "agentOverrides": {
+      "orchestrator": {
+        "model": "anthropic/claude-sonnet-4-6",
+        "thinking": "high"
+      },
+      "architect": {
+        "model": "anthropic/claude-sonnet-4-6",
+        "thinking": "high"
+      },
+      "epub-engineer": {
+        "thinking": "medium"
+      },
+      "tts-engineer": {
+        "thinking": "medium"
+      },
+      "audio-engineer": {
+        "thinking": "medium"
+      },
+      "tester": {
+        "model": "anthropic/claude-sonnet-4-6",
+        "thinking": "high"
+      },
+      "reviewer": {
+        "model": "anthropic/claude-opus-4-8",
+        "thinking": "high"
+      }
+    }
+  }
+}

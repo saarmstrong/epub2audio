@@ -1,0 +1,29 @@
+{
+  "project": "epub2audio",
+  "description": "Convert EPUB ebooks to audiobooks using local Kokoro TTS",
+  "defaultAgent": "orchestrator",
+  "agents": [
+    { "id": "orchestrator",  "file": ".pi/agents/orchestrator.md" },
+    { "id": "architect",     "file": ".pi/agents/architect.md" },
+    { "id": "epub-engineer", "file": ".pi/agents/epub-engineer.md" },
+    { "id": "tts-engineer",  "file": ".pi/agents/tts-engineer.md" },
+    { "id": "audio-engineer","file": ".pi/agents/audio-engineer.md" },
+    { "id": "tester",        "file": ".pi/agents/tester.md" },
+    { "id": "reviewer",      "file": ".pi/agents/reviewer.md" }
+  ],
+  "prompts": [
+    { "id": "start-milestone",   "file": ".pi/prompts/start-milestone.md" },
+    { "id": "review-branch",     "file": ".pi/prompts/review-branch.md" },
+    { "id": "run-verification",  "file": ".pi/prompts/run-verification.md" }
+  ],
+  "docs": [
+    "docs/status.md",
+    "docs/architecture.md",
+    "docs/product-spec.md"
+  ],
+  "contextFiles": [
+    "AGENTS.md",
+    "docs/status.md",
+    "tasks/backlog.md"
+  ]
+}
