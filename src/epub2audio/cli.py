@@ -172,7 +172,10 @@ def convert(
     output_format: str = typer.Option(
         "mp3",
         "--format",
-        help="Output format: 'mp3' (one file per chapter) or 'm4b' (single audiobook).",
+        help=(
+            "Output format: 'mp3' (one file per chapter), 'm4b' (single "
+            "audiobook), or 'both' (per-chapter MP3s and a single M4B in one run)."
+        ),
     ),
     bitrate: str = typer.Option("96k", "--bitrate", help="Audio bitrate, e.g. '96k'."),
     sample_rate: int = typer.Option(24000, "--sample-rate", help="Output sample rate in Hz."),
@@ -206,8 +209,9 @@ def convert(
 
     With ``--format mp3`` (default) produces one MP3 file per logical chapter
     in reading order, named ``NNN - Chapter Title.mp3``.  With ``--format m4b``
-    produces a single ``.m4b`` audiobook with embedded chapter markers.
-    Output is written to *output*.
+    produces a single ``.m4b`` audiobook with embedded chapter markers.  With
+    ``--format both`` produces per-chapter MP3s AND a single ``.m4b`` in one
+    synthesis pass.  Output is written to *output*.
 
     TTS engine selection: uses Kokoro if available, otherwise falls back to
     the built-in ``FakeTTSEngine`` (silent audio, useful for testing the
