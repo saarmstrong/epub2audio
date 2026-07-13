@@ -1,19 +1,20 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-13 (M10 pronunciation subsystem — ✅ complete; independent Reviewer sign-off after wiring fix)_
+_Last updated: 2026-07-13 (M11 optional validation stage — ✅ complete; independent Reviewer-approved)_
 
 ---
 
 ## Current Milestone
 
-**Milestones 8–10** — Narration Director + provider-adapter pipeline +
-pronunciation — ✅ Complete (independent Reviewer sign-off each).
-**Milestones 11–12** — 📋 Planned (design in `docs/decisions/003-narration-pipeline.md`).
+**Milestones 8–11** — Narration Director + provider-adapter pipeline +
+pronunciation + validation — ✅ Complete (independent Reviewer sign-off each).
+**Milestone 12** — 📋 Planned (design in `docs/decisions/003-narration-pipeline.md`).
 
-M1–M10 complete. The `Feature.md` vision is being delivered as an **additive,
+M1–M11 complete. The `Feature.md` vision is being delivered as an **additive,
 rule-based** evolution (no rename of existing packages, no LLM in v1). M4B
 (Feature.md goal #1) shipped in M7; the Director (M8), provider-adapter layer
-(M9), and pronunciation dictionary (M10) are wired end-to-end.
+(M9), pronunciation dictionary (M10), and the optional `--validate` quality
+stage (M11) are all wired end-to-end.
 
 ### Planned scope (M8–M12)
 
@@ -33,6 +34,40 @@ Three-layer separation — **Director** (business logic, provider-neutral) →
 
 Tasks are enumerated in `tasks/backlog.md` (M8-01 … M12-06). Each milestone keeps
 the standard gates green and requires Reviewer sign-off before completion.
+
+## Reviewer Sign-off — Milestone 11 (2026-07-13) — Optional validation stage
+
+**Result: APPROVED** (independent fresh-context Reviewer; verified end-to-end via
+a real `epub2audio convert --validate` invocation, not just unit tests).
+
+Gates: `pytest tests/ -q` → **395 passed / 6 skipped / 1 xfailed** (+43 tests:
+validation checks, CLI integration, strengthened M9-09 multiset); `mypy
+src/epub2audio` → 0 errors (58 files, strict); `ruff check` + `ruff
+format --check` → clean.
+
+What landed: `ValidationSeverity`/`ValidationIssue`/`ValidationReport` (ADR-006);
+`validation/` package with pure per-check functions + `validate_conversion`
+orchestrator (`missing_chapter`, `skipped_text` [M4B duration-only / MP3
+duration+output_path], `invalid_metadata` per-field, `overlapping_timestamps`
++ `non_contiguous_timeline` [M4B], `chapter_duration` warning [de-duped vs
+skipped], `missing_output_file`, `report_error`, honest pronunciation stub);
+`ok`/counts derived via one `_assemble` helper so they cannot drift; CLI
+`--validate` (off by default) writes `validation-report.json`; default path
+byte-identical; validation failures do NOT change exit code in M11 (documented;
+`--fail-on-validation` noted for the future).
+
+Reviewer-recommended follow-up actioned during sign-off: added two real
+`CliRunner`-driven `convert --validate` tests (provider factory monkeypatched to
+FakeTTSEngine) so the CLI wiring itself is guarded, not just the call chain
+(`3ba6f70`).
+
+Non-blocking items carried to M12: (1) flag a `None` M4B `output_path` as
+`missing_output_file` when chapters exist; (2) broaden the AST import-boundary
+test to cover `import x` and `__init__.py`; (3) consider a `model_validator`
+to prevent count drift on externally-constructed/deserialized reports (or
+accept the ADR-006 tradeoff explicitly).
+
+---
 
 ## Reviewer Sign-off — Milestone 10 (2026-07-13) — Pronunciation subsystem
 
@@ -216,7 +251,7 @@ Exact for the current fixtures.
 | 8 | Narration data models + rule-based Director | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationPlan` models + `director/` package; scene-aware, deterministic; 252 pass (+38), mypy/ruff green |
 | 9 | Provider-adapter abstraction + Kokoro adapter | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationProvider` Protocol + Kokoro adapter; Director wired into pipeline; 308 pass (+56), MP3/M4B verified unchanged |
 | 10 | Pronunciation subsystem | ✅ Complete | Reviewer-approved 2026-07-13 (after wiring-blocker fix); `pronunciation/` package + Director hints + Kokoro substitution, wired end-to-end via `pronunciation_dictionary`; 352 pass (+44), mypy/ruff clean |
-| 11 | Optional validation stage | 📋 Planned | `--validate`; skipped text, timestamps, chapter-duration consistency |
+| 11 | Optional validation stage | ✅ Complete | Reviewer-approved 2026-07-13 (verified via real `convert --validate`); `validation/` package + `--validate` writes `validation-report.json`; 395 pass (+43), mypy/ruff clean |
 | 12 | Additive restructure + config + docs | 📋 Planned | `output/`+`metadata/` shims, `output_format: both`, architecture docs |
 
 ---

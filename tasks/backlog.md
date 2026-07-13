@@ -161,10 +161,10 @@ _Carry-forward from M8 review (non-blocking):_
 
 ## Milestone 11 — Optional Validation Stage
 
-- [ ] `M11-01` — Audio Engineer: `validation/` — skipped text, missing chapters, invalid metadata, overlapping timestamps, chapter-duration consistency, pronunciation failures
-- [ ] `M11-02` — Audio Engineer: CLI `--validate` flag → validation report next to `conversion-report.json` (off by default)
-- [ ] `M11-03` — Tester: validation-stage unit tests
-- [ ] `M11-04` — Reviewer: run `convert --validate`, verify report + no false positives on fixtures
+- [x] `M11-01` — Audio Engineer: `validation/` — skipped text, missing chapters, invalid metadata, overlapping timestamps, chapter-duration consistency, pronunciation failures
+- [x] `M11-02` — Audio Engineer: CLI `--validate` flag → validation report next to `conversion-report.json` (off by default)
+- [x] `M11-03` — Tester: validation-stage unit tests
+- [x] `M11-04` — Reviewer: run `convert --validate`, verify report + no false positives on fixtures
 
 ---
 
@@ -176,3 +176,8 @@ _Carry-forward from M8 review (non-blocking):_
 - [ ] `M12-04` — Write `docs/architecture.md` narration-pipeline section (deliverable #6)
 - [ ] `M12-05` — Update README + CHANGELOG + example `epub2audio.toml`
 - [ ] `M12-06` — Reviewer: verify all Feature.md deliverables (1–7) satisfied
+
+_Carry-forward from M11 review (non-blocking):_
+- [ ] `M12-07` — Validation: flag a `None` M4B `output_path` as `missing_output_file` when chapters exist (currently only caught indirectly via `report.errors`)
+- [ ] `M12-08` — Tests: broaden the `validation/` AST import-boundary test to cover `import x` statements and `__init__.py` (not just `ImportFrom` in `checks.py`)
+- [ ] `M12-09` — Consider a `model_validator` on `ValidationReport` to prevent count drift on externally-constructed/deserialized reports (or document the ADR-006 tradeoff explicitly)
