@@ -52,6 +52,10 @@ class Settings(BaseSettings):
         default=False,
         description="Keep intermediate segment WAV files after successful conversion.",
     )
+    pronunciation_dictionary: Path | None = Field(
+        default=None,
+        description="Path to a pronunciations.yaml lexicon, or None to disable.",
+    )
 
     @field_validator("output_format", mode="before")
     @classmethod

@@ -238,18 +238,42 @@ class EmphasisHint(BaseModel):
 
 
 class PronunciationHint(BaseModel):
-    """A reference from a segment to a pronunciation-lexicon entry.
+    """Provider-neutral pronunciation annotation for a lexicon term in a segment.
 
-    The Director only *flags* which terms appear in a segment; the actual
-    pronunciation (IPA / phonemes / substitution) lives in the pronunciation
-    subsystem (Milestone 10) and is applied by the provider adapter.  Keeping
-    the pronunciation itself out of the plan preserves provider neutrality.
+    The Narration Director resolves each term against the pronunciation lexicon
+    (``pronunciations.yaml``) and **bakes** the provider-neutral representations
+    directly into this hint.  The ``term`` is the verbatim substring of the
+    segment text that triggered the lookup.  Both ``ipa`` and ``respelling`` are
+    optional because a lexicon entry may supply one, both, or neither (in which
+    case the provider falls back to its default grapheme-to-phoneme handling).
+
+    Provider adapters apply whichever representation they support:
+
+    * **Kokoro** (grapheme-based) — substitutes ``respelling`` in the rendered
+      text (e.g. ``"Ono-Sendai"`` → ``"Oh-no Sen-DYE"``).
+    * **Azure** (SSML-capable) — emits ``<phoneme alphabet="ipa">`` using ``ipa``.
+
+    The provider is a *pure plan-mapper*: it never loads the lexicon and never
+    re-scans the text for terms.  This keeps the lexicon a Director-only concern
+    and satisfies the "no business logic in providers" rule from ADR-003.
     """
 
     model_config = ConfigDict(frozen=True)
 
     term: str
     """Verbatim substring of the segment text that has a lexicon entry."""
+
+    ipa: str | None = None
+    """International Phonetic Alphabet transcription of ``term``, or ``None`` if
+    the lexicon entry does not supply one.  Engine-neutral; consumed by
+    SSML-capable providers (e.g. Azure ``<phoneme alphabet="ipa">``).
+    Example: ``"/oʊnoʊ sɛnˈdaɪ/"``."""
+
+    respelling: str | None = None
+    """Plain phonetic respelling of ``term``, or ``None`` if the lexicon entry
+    does not supply one.  Intended for grapheme-based engines (e.g. Kokoro)
+    that realize pronunciation by text substitution rather than IPA.
+    Example: ``"Oh-no Sen-DYE"``."""
 
 
 class NarrationDirection(BaseModel):

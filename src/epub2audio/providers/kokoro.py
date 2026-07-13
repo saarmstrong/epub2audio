@@ -33,7 +33,7 @@ from __future__ import annotations
 import re
 
 from epub2audio.config import Settings
-from epub2audio.models import AudioChunk, NarrationDirection, NarrationSegment
+from epub2audio.models import AudioChunk, NarrationDirection, NarrationSegment, PronunciationHint
 from epub2audio.providers.base import ProviderRequest
 from epub2audio.tts.base import TTSEngine
 
@@ -57,6 +57,40 @@ _WHITESPACE_RE = re.compile(r"[ \t\r\n]+")
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _apply_pronunciations(text: str, hints: list[PronunciationHint]) -> str:
+    """Substitute whole-token occurrences of each hint term with its respelling.
+
+    Only hints that carry a non-empty ``respelling`` are applied — Kokoro is a
+    grapheme-based engine and cannot consume IPA directly.  Hints with
+    ``respelling=None`` are silently skipped so the provider never errors on
+    partial lexicon entries.
+
+    Substitutions use the same whole-token boundary rules as
+    :func:`~epub2audio.pronunciation.lexicon._build_pattern` (``(?<![\\w-])TERM
+    (?![\\w-])``) so that a respelling for ``"Sendai"`` does not corrupt
+    ``"Ono-Sendai"`` if both somehow appear in the same segment.
+
+    When *hints* is empty the function returns *text* unchanged, preserving
+    byte-identical output for segments with no pronunciation annotations.
+
+    Args:
+        text: The segment text, prior to Kokoro punctuation normalization.
+        hints: Pronunciation hints from :attr:`NarrationSegment.pronunciation_hints`.
+
+    Returns:
+        *text* with all applicable respellings substituted.
+    """
+    if not hints:
+        return text
+    result = text
+    for hint in hints:
+        if not hint.respelling:
+            continue
+        pattern = re.compile(r"(?<![\w\-])" + re.escape(hint.term) + r"(?![\w\-])")
+        result = pattern.sub(hint.respelling, result)
+    return result
 
 
 def _normalize_for_kokoro(text: str) -> str:
@@ -180,9 +214,11 @@ class KokoroProvider:
         raw_speed = direction.pace * settings.speed
         speed = round(_clamp(raw_speed, _SPEED_MIN, _SPEED_MAX), 3)
 
-        # TODO(M10): apply pronunciation-dictionary substitutions here,
-        # before normalization, so phoneme hints reach the synthesis engine.
-        text = _normalize_for_kokoro(segment.text)
+        # Apply pronunciation-dictionary substitutions (respelling only for
+        # Kokoro) BEFORE punctuation normalization so phoneme hints reach the
+        # synthesis engine with correct text.
+        text = _apply_pronunciations(segment.text, segment.pronunciation_hints)
+        text = _normalize_for_kokoro(text)
 
         return ProviderRequest(
             segment_id=segment.id,

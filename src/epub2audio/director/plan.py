@@ -23,6 +23,7 @@ from epub2audio.models import (
     NarrationSegment,
     TextSegment,
 )
+from epub2audio.pronunciation.lexicon import PronunciationLexicon
 from epub2audio.text.normalize import normalize_text
 from epub2audio.text.pauses import get_pause
 from epub2audio.text.segment import segment_text
@@ -99,6 +100,7 @@ def _build_segment(
     scene_direction: NarrationDirection,
     scene_intensity: float,
     is_last_in_scene: bool,
+    lexicon: PronunciationLexicon | None = None,
 ) -> NarrationSegment:
     """Assemble a single :class:`NarrationSegment` from a chunk of text."""
     seg_type, speaker = dialogue.classify(text)
@@ -123,12 +125,17 @@ def _build_segment(
         pause_after_ms=_pause_after_ms(text, is_last_in_scene),
         pace=effective_pace,
         emphasis=emphasis.extract_emphasis(text),
-        # Pronunciation hints are populated once the lexicon lands (Milestone 10).
-        pronunciation_hints=[],
+        pronunciation_hints=(
+            [e.to_hint() for e in lexicon.find_terms(text)] if lexicon is not None else []
+        ),
     )
 
 
-def build_narration_plan(chapter_text: str, chapter_index: int) -> list[NarrationPlan]:
+def build_narration_plan(
+    chapter_text: str,
+    chapter_index: int,
+    lexicon: PronunciationLexicon | None = None,
+) -> list[NarrationPlan]:
     """Build one narration plan per scene for a chapter.
 
     Pipeline:
@@ -137,12 +144,17 @@ def build_narration_plan(chapter_text: str, chapter_index: int) -> list[Narratio
     2. Split it into scenes (:func:`~epub2audio.director.scenes.split_scenes`).
     3. For each scene, derive a scene-level :class:`NarrationDirection` from
        deterministic text signals, then segment the scene and direct each
-       segment (dialogue/speaker, emphasis, pause, optional intensity override).
+       segment (dialogue/speaker, emphasis, pause, optional intensity override,
+       pronunciation hints resolved from *lexicon*).
 
     Args:
         chapter_text: Cleaned narration text for the chapter (the output of
             :func:`~epub2audio.epub.cleanup.xhtml_to_text`).
         chapter_index: 1-based index of the chapter within the book.
+        lexicon: Optional :class:`~epub2audio.pronunciation.lexicon.PronunciationLexicon`
+            used to resolve pronunciation hints for each segment.  When
+            ``None`` (the default), ``pronunciation_hints`` is always empty
+            and all existing callers are unaffected.
 
     Returns:
         An ordered list of :class:`NarrationPlan`, one per non-empty scene.
@@ -180,6 +192,7 @@ def build_narration_plan(chapter_text: str, chapter_index: int) -> list[Narratio
                 scene_direction=scene_direction,
                 scene_intensity=scene_intensity,
                 is_last_in_scene=(i == last_idx),
+                lexicon=lexicon,
             )
             for i, ts in enumerate(text_segments)
         ]
