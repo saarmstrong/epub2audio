@@ -21,7 +21,9 @@ import shutil
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from epub2audio.cli import app
 from epub2audio.config import Settings
 from epub2audio.models import ValidationReport
 from epub2audio.pipeline.converter import convert_epub
@@ -107,3 +109,57 @@ def test_no_validate_flag_no_report(tmp_path: Path) -> None:
     assert not vr_path.exists(), (
         "validation-report.json was written even though --validate was not set"
     )
+
+
+# ---------------------------------------------------------------------------
+# Real CLI-command tests (guard the actual `convert --validate` wiring)
+# ---------------------------------------------------------------------------
+#
+# These invoke the Typer ``convert`` command through ``CliRunner`` so they fail
+# if the ``--validate`` branch in cli.py is removed or broken (the helper-based
+# tests above exercise the call chain but not the CLI wiring itself).  The
+# provider factory is monkeypatched to a FakeTTSEngine-backed adapter so the
+# command runs fast and never needs the real Kokoro model.
+
+
+@pytest.fixture
+def _fake_provider_cli(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force the CLI's provider selection to use a FakeTTSEngine-backed adapter."""
+
+    def _fake_build(lang_code: str = "a") -> KokoroProvider:
+        return KokoroProvider(FakeTTSEngine())
+
+    monkeypatch.setattr("epub2audio.providers.kokoro.build_kokoro_provider", _fake_build)
+
+
+@pytest.mark.usefixtures("_fake_provider_cli")
+def test_cli_convert_validate_writes_report(tmp_path: Path) -> None:
+    """`convert --validate` (real command) writes a clean validation-report.json."""
+    epub_path = build_simple_epub3(tmp_path / "book.epub")
+    out = tmp_path / "output"
+
+    result = CliRunner().invoke(
+        app,
+        ["convert", str(epub_path), "-o", str(out), "--validate", "--quiet"],
+    )
+
+    assert result.exit_code == 0, result.output
+    vr_path = out / "validation-report.json"
+    assert vr_path.exists(), "validation-report.json not written by `convert --validate`"
+    vr = ValidationReport(**json.loads(vr_path.read_text(encoding="utf-8")))
+    assert vr.ok is True, f"issues: {vr.issues}"
+
+
+@pytest.mark.usefixtures("_fake_provider_cli")
+def test_cli_convert_without_validate_writes_no_report(tmp_path: Path) -> None:
+    """The real `convert` command without `--validate` writes no validation report."""
+    epub_path = build_simple_epub3(tmp_path / "book.epub")
+    out = tmp_path / "output"
+
+    result = CliRunner().invoke(
+        app,
+        ["convert", str(epub_path), "-o", str(out), "--quiet"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert not (out / "validation-report.json").exists()
