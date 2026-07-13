@@ -6,9 +6,9 @@ other epub2audio module.  All other modules may import from here.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 # ---------------------------------------------------------------------------
 # Navigation / structural models
@@ -578,6 +578,14 @@ class ValidationReport(BaseModel):
 
     ``ok`` is ``True`` if and only if there are **no** ``"error"``-severity
     issues; warnings and info entries do not affect it.
+
+    **Count fields are always derived from** :attr:`issues` **at construction
+    time** via a ``@model_validator``.  Any values passed explicitly for
+    ``ok``, ``error_count``, ``warning_count``, or ``info_count`` are
+    silently overridden to match the actual issue list.  This prevents
+    count drift in deserialized or externally-constructed reports.
+    See ``docs/decisions/006-validation-models.md`` (M12-09 amendment) and
+    ``docs/decisions/007-output-both-and-config.md`` §M12-09.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -588,6 +596,9 @@ class ValidationReport(BaseModel):
     This is the single gate a caller checks to decide whether a conversion
     passed validation.  Warnings and info items are surfaced in :attr:`issues`
     but do not flip ``ok`` to ``False``.
+
+    **Always recomputed from** :attr:`issues` **by the model validator.**
+    Any value supplied at construction is overridden.
     """
 
     issues: list[ValidationIssue] = []
@@ -601,18 +612,43 @@ class ValidationReport(BaseModel):
     """Number of ``"error"``-severity issues in :attr:`issues`.
 
     Provided as a convenience so callers can display a summary without
-    iterating :attr:`issues`.  Must equal
-    ``sum(1 for i in issues if i.severity == "error")``.
+    iterating :attr:`issues`.  **Always recomputed from** :attr:`issues`
+    **by the model validator.**
     """
 
     warning_count: int
     """Number of ``"warning"``-severity issues in :attr:`issues`.
 
-    Must equal ``sum(1 for i in issues if i.severity == "warning")``.
+    **Always recomputed from** :attr:`issues` **by the model validator.**
     """
 
     info_count: int
     """Number of ``"info"``-severity issues in :attr:`issues`.
 
-    Must equal ``sum(1 for i in issues if i.severity == "info")``.
+    **Always recomputed from** :attr:`issues` **by the model validator.**
     """
+
+    @model_validator(mode="after")
+    def _recompute_counts(self) -> Self:
+        """Recompute ``ok`` and severity counts from :attr:`issues`.
+
+        This validator runs after every construction path — explicit
+        ``ValidationReport(...)`` calls, ``model_validate()``, and JSON
+        deserialization.  It guarantees that ``ok``, ``error_count``,
+        ``warning_count``, and ``info_count`` are always consistent with
+        :attr:`issues`, regardless of what values were supplied externally.
+
+        ``object.__setattr__`` is used to bypass the frozen-model guard;
+        this is the Pydantic v2-documented pattern for mutating frozen model
+        fields inside validators (see Pydantic docs §"frozen models").
+        The mutation occurs once, during construction, and the instance is
+        logically immutable thereafter.
+        """
+        error_count = sum(1 for i in self.issues if i.severity == "error")
+        warning_count = sum(1 for i in self.issues if i.severity == "warning")
+        info_count = sum(1 for i in self.issues if i.severity == "info")
+        object.__setattr__(self, "ok", error_count == 0)
+        object.__setattr__(self, "error_count", error_count)
+        object.__setattr__(self, "warning_count", warning_count)
+        object.__setattr__(self, "info_count", info_count)
+        return self

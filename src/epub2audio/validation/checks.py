@@ -155,7 +155,7 @@ def check_skipped_text(
         if result.duration_seconds <= 0:
             skipped = True
             reason = "duration is zero or negative"
-        elif settings.output_format == "mp3" and result.output_path is None:
+        elif settings.output_format in ("mp3", "both") and result.output_path is None:
             skipped = True
             reason = "output_path is None (no audio file produced)"
 
@@ -229,7 +229,7 @@ def check_timestamps(
     Returns:
         A (possibly empty) list of :class:`ValidationIssue` objects.
     """
-    if settings.output_format != "m4b":
+    if settings.output_format not in ("m4b", "both"):
         return []
     markers: list[ChapterMarker] = report.chapter_markers
     if not markers:
@@ -344,8 +344,22 @@ def check_missing_output_files(
     """
     issues: list[ValidationIssue] = []
 
-    if settings.output_format == "m4b":
-        if report.output_path is not None and not Path(report.output_path).exists():
+    # M4B / both: check book-level M4B path.
+    if settings.output_format in ("m4b", "both"):
+        if report.output_path is None and report.chapter_results:
+            # M12-07: assembly was expected but produced no output_path.
+            issues.append(
+                _issue(
+                    code="missing_output_file",
+                    severity="error",
+                    message=(
+                        "M4B output was expected but report.output_path is None "
+                        "(assembly may have failed)."
+                    ),
+                    chapter_id=None,
+                )
+            )
+        elif report.output_path is not None and not Path(report.output_path).exists():
             issues.append(
                 _issue(
                     code="missing_output_file",
@@ -357,7 +371,9 @@ def check_missing_output_files(
                     chapter_id=None,
                 )
             )
-    else:
+
+    # MP3 / both: check per-chapter MP3 paths.
+    if settings.output_format in ("mp3", "both"):
         for result in report.chapter_results:
             if result.output_path is not None and not Path(result.output_path).exists():
                 issues.append(

@@ -275,7 +275,12 @@ def _process_chapter(
             [],
         )
 
-    plans = build_narration_plan(raw_text, chapter_index, lexicon=lexicon)
+    plans = build_narration_plan(
+        raw_text,
+        chapter_index,
+        lexicon=lexicon,
+        scene_analysis=settings.scene_analysis,
+    )
     flat_segments = _flatten_plan(plans)
 
     if not flat_segments:
@@ -367,37 +372,49 @@ def _process_chapter(
     else:
         encode_src = chapter_wav
 
-    if settings.output_format == "m4b":
-        # Per-chapter AAC segment persisted in the work dir; the single .m4b is
-        # muxed after all chapters succeed.  No per-chapter metadata here.
-        produced_path = chapter_work / "chapter.m4a"
+    needs_mp3 = settings.output_format in ("mp3", "both")
+    needs_m4b = settings.output_format in ("m4b", "both")
+
+    mp3_path: Path | None = None
+    aac_path: Path | None = None
+
+    if needs_mp3:
+        output_filename = sanitize_filename(chapter.title, chapter_index)
+        mp3_path = output_dir / output_filename
+        encode_mp3(
+            encode_src,
+            mp3_path,
+            bitrate=settings.bitrate,
+            sample_rate=settings.sample_rate,
+        )
+        validate_mp3(mp3_path, expected_sample_rate=settings.sample_rate)
+
+    if needs_m4b:
+        # Per-chapter AAC persisted in the work dir; the single .m4b is muxed
+        # after all chapters succeed.  The deterministic path is consumed by
+        # the M4B assembly block in convert_epub.
+        aac_path = chapter_work / "chapter.m4a"
         encode_aac(
             encode_src,
-            produced_path,
+            aac_path,
             bitrate=settings.bitrate,
             sample_rate=settings.sample_rate,
         )
         validate_audio(
-            produced_path,
+            aac_path,
             expected_codec="aac",
             expected_sample_rate=settings.sample_rate,
         )
-    else:
-        output_filename = sanitize_filename(chapter.title, chapter_index)
-        produced_path = output_dir / output_filename
-        encode_mp3(
-            encode_src,
-            produced_path,
-            bitrate=settings.bitrate,
-            sample_rate=settings.sample_rate,
-        )
-        validate_mp3(produced_path, expected_sample_rate=settings.sample_rate)
+
+    # ChapterResult.output_path = MP3 when present, else AAC (pure-m4b).
+    produced_path = mp3_path if mp3_path is not None else aac_path
 
     # ------------------------------------------------------------------ #
     # Probe the produced file for its real duration                        #
     # ------------------------------------------------------------------ #
+    probe_target = mp3_path if mp3_path is not None else aac_path
     try:
-        duration_seconds = probe_duration(produced_path)
+        duration_seconds = probe_duration(probe_target) if probe_target is not None else 0.0
     except Exception as exc:
         log.warning("Chapter %r: duration probe failed: %s", chapter.chapter_id, exc)
         duration_seconds = 0.0
@@ -611,32 +628,32 @@ def convert_epub(
 
             # Metadata: MP3 gets per-file ID3 tags + cover embedded now.
             # For M4B the tags/chapters/cover are applied once in the final mux.
-            if result.output_path is not None:
-                if settings.output_format == "mp3":
-                    mp3_path = Path(result.output_path)
-                    try:
-                        embed_metadata(
-                            mp3_path=mp3_path,
-                            metadata=book_metadata,
-                            track_number=idx,
-                            total_tracks=total_chapters,
-                            chapter_title=chapter.title,
-                            cover_bytes=cover_bytes,
-                        )
-                    except Exception as meta_exc:
-                        log.warning(
-                            "Chapter %r: metadata embedding failed: %s",
-                            chapter.chapter_id,
-                            meta_exc,
-                        )
-                        result = ChapterResult(
-                            chapter_id=result.chapter_id,
-                            duration_seconds=result.duration_seconds,
-                            warnings=[*result.warnings, f"Metadata embedding failed: {meta_exc}"],
-                            output_path=result.output_path,
-                        )
+            if result.output_path is not None and settings.output_format in ("mp3", "both"):
+                mp3_embed_path = Path(result.output_path)
+                try:
+                    embed_metadata(
+                        mp3_path=mp3_embed_path,
+                        metadata=book_metadata,
+                        track_number=idx,
+                        total_tracks=total_chapters,
+                        chapter_title=chapter.title,
+                        cover_bytes=cover_bytes,
+                    )
+                except Exception as meta_exc:
+                    log.warning(
+                        "Chapter %r: metadata embedding failed: %s",
+                        chapter.chapter_id,
+                        meta_exc,
+                    )
+                    result = ChapterResult(
+                        chapter_id=result.chapter_id,
+                        duration_seconds=result.duration_seconds,
+                        warnings=[*result.warnings, f"Metadata embedding failed: {meta_exc}"],
+                        output_path=result.output_path,
+                    )
 
-                successful_chapter_ids.append(chapter.chapter_id)
+            # Mark chapter successful regardless of output_format.
+            successful_chapter_ids.append(chapter.chapter_id)
 
         except Exception as exc:
             log.error("Chapter %r failed: %s", chapter.chapter_id, exc)
@@ -668,13 +685,23 @@ def convert_epub(
     # M4B assembly: mux per-chapter AAC segments into one .m4b            #
     # (must run before work-dir cleanup, which removes the segments).      #
     # ------------------------------------------------------------------ #
+    needs_m4b_assembly = settings.output_format in ("m4b", "both")
     m4b_output_path: str | None = None
     m4b_markers: list[ChapterMarker] = []
-    if settings.output_format == "m4b":
+    if needs_m4b_assembly:
         chapter_audio: list[Path] = []
         cursor_ms = 0
         for chapter, result in zip(chapters, chapter_results, strict=True):
-            if result.output_path is None:
+            # In both-mode the work-dir AAC is the mux source (result.output_path
+            # is the MP3); in pure-m4b mode it is also the work-dir AAC.  Always
+            # derive the path from the deterministic work-dir location.
+            aac_src = work_root / chapter.chapter_id / "chapter.m4a"
+            if not aac_src.exists():
+                log.warning(
+                    "Chapter %r: AAC mux source not found at %s — skipping in M4B.",
+                    chapter.chapter_id,
+                    aac_src,
+                )
                 continue
             start_ms = cursor_ms
             end_ms = start_ms + round(result.duration_seconds * 1000)
@@ -686,7 +713,7 @@ def convert_epub(
                     end_ms=end_ms,
                 )
             )
-            chapter_audio.append(Path(result.output_path))
+            chapter_audio.append(aac_src)
             cursor_ms = end_ms
 
         if chapter_audio:
@@ -715,16 +742,18 @@ def convert_epub(
                 # Leave the work dir intact so --resume can retry the mux.
                 successful_chapter_ids = []
 
-        # Audio now lives inside the single .m4b; per-chapter files do not exist.
-        chapter_results = [
-            ChapterResult(
-                chapter_id=r.chapter_id,
-                duration_seconds=r.duration_seconds,
-                warnings=r.warnings,
-                output_path=None,
-            )
-            for r in chapter_results
-        ]
+        # Pure-m4b: audio lives inside the single .m4b; per-chapter paths are None.
+        # both: keep per-chapter MP3 output_paths; the report also carries the M4B.
+        if settings.output_format == "m4b":
+            chapter_results = [
+                ChapterResult(
+                    chapter_id=r.chapter_id,
+                    duration_seconds=r.duration_seconds,
+                    warnings=r.warnings,
+                    output_path=None,
+                )
+                for r in chapter_results
+            ]
 
     # ------------------------------------------------------------------ #
     # Post-run cleanup of persistent work dirs                             #

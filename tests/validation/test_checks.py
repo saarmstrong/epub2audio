@@ -487,3 +487,96 @@ class TestValidateConversion:
                     assert not node.module.startswith(prefix), (
                         f"validation/checks.py must not import from {prefix}, found: {node.module}"
                     )
+
+
+# ---------------------------------------------------------------------------
+# ValidationReport model_validator (M12-09)
+# ---------------------------------------------------------------------------
+
+
+class TestValidationReportModelValidator:
+    """Verify that the @model_validator on ValidationReport enforces count invariants.
+
+    The model_validator unconditionally recomputes ok, error_count, warning_count,
+    and info_count from the issues list, regardless of what values were supplied at
+    construction time (ADR-006 M12-09 revision, ADR-007 §M12-09).
+    """
+
+    def test_correct_inputs_unchanged(self) -> None:
+        """When correct values are passed, the model_validator is a no-op."""
+        from epub2audio.models import ValidationIssue, ValidationReport
+
+        issues = [ValidationIssue(code="x", severity="error", message="m")]
+        r = ValidationReport(ok=False, issues=issues, error_count=1, warning_count=0, info_count=0)
+        assert r.ok is False
+        assert r.error_count == 1
+        assert r.warning_count == 0
+        assert r.info_count == 0
+
+    def test_wrong_ok_is_corrected(self) -> None:
+        """ok=True with error issues is corrected to False by the model_validator."""
+        from epub2audio.models import ValidationIssue, ValidationReport
+
+        issues = [ValidationIssue(code="x", severity="error", message="e")]
+        # Deliberately supply wrong ok and wrong counts
+        r = ValidationReport(ok=True, issues=issues, error_count=99, warning_count=0, info_count=0)
+        assert r.ok is False  # corrected
+        assert r.error_count == 1  # corrected
+
+    def test_wrong_counts_are_corrected(self) -> None:
+        """Supplying wrong counts with mixed-severity issues is always corrected."""
+        from epub2audio.models import ValidationIssue, ValidationReport
+
+        issues = [
+            ValidationIssue(code="a", severity="error", message="e1"),
+            ValidationIssue(code="b", severity="error", message="e2"),
+            ValidationIssue(code="c", severity="warning", message="w"),
+            ValidationIssue(code="d", severity="info", message="i"),
+        ]
+        # Supply all-wrong counts
+        r = ValidationReport(ok=True, issues=issues, error_count=0, warning_count=0, info_count=0)
+        assert r.ok is False
+        assert r.error_count == 2
+        assert r.warning_count == 1
+        assert r.info_count == 1
+
+    def test_empty_issues_always_ok(self) -> None:
+        """An empty issues list always produces ok=True and zero counts."""
+        from epub2audio.models import ValidationReport
+
+        # Supply wrong ok
+        r = ValidationReport(ok=False, issues=[], error_count=5, warning_count=3, info_count=1)
+        assert r.ok is True
+        assert r.error_count == 0
+        assert r.warning_count == 0
+        assert r.info_count == 0
+
+    def test_json_roundtrip_corrects_stale_counts(self) -> None:
+        """Deserializing a JSON blob with wrong counts yields a corrected report."""
+        import json
+
+        from epub2audio.models import ValidationReport
+
+        # Simulate a stale or hand-edited JSON report
+        stale_json = json.dumps(
+            {
+                "ok": True,
+                "issues": [{"code": "e", "severity": "error", "message": "bad"}],
+                "error_count": 0,
+                "warning_count": 0,
+                "info_count": 0,
+            }
+        )
+        r = ValidationReport.model_validate_json(stale_json)
+        assert r.ok is False
+        assert r.error_count == 1
+
+    def test_frozen_after_construction(self) -> None:
+        """ValidationReport remains frozen after the model_validator runs."""
+        from pydantic import ValidationError as PydanticValidationError
+
+        from epub2audio.models import ValidationReport
+
+        r = ValidationReport(ok=True, issues=[], error_count=0, warning_count=0, info_count=0)
+        with pytest.raises((AttributeError, PydanticValidationError, TypeError)):
+            r.ok = False  # type: ignore[misc]

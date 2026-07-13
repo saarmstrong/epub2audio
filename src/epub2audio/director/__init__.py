@@ -11,7 +11,7 @@ never rewrites prose and never invents dialogue.  See
 docs/decisions/003-narration-pipeline.md.
 
 Public API:
-    build_narration_plan(chapter_text, chapter_index, lexicon=None) -> list[NarrationPlan]
+    build_narration_plan(chapter_text, chapter_index, *, lexicon=None, scene_analysis=True) -> list[NarrationPlan]
 """
 
 from __future__ import annotations

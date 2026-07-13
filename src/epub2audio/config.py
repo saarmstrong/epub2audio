@@ -17,6 +17,20 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# ---------------------------------------------------------------------------
+# Provider registry
+# ---------------------------------------------------------------------------
+#
+# Only providers with a real (non-stub) adapter wired into the pipeline appear
+# here.  When a stub adapter (OpenAI, Gemini, Azure, ElevenLabs) is promoted
+# to a full implementation, add its normalised name to this set and update the
+# error message in :meth:`Settings.validate_provider`.
+#
+# Milestone 12: only "kokoro" is wired.  Provider selection expands in future
+# milestones as stubs are implemented (see docs/decisions/007-output-both-and-config.md).
+
+_SUPPORTED_PROVIDERS: frozenset[str] = frozenset({"kokoro"})
+
 
 class Settings(BaseSettings):
     """Application-wide settings for epub2audio.
@@ -36,9 +50,40 @@ class Settings(BaseSettings):
     speed: Annotated[float, Field(ge=0.25, le=4.0)] = Field(
         default=1.0, description="TTS speed multiplier (0.25–4.0)."
     )
-    output_format: Literal["mp3", "m4b"] = Field(
+    output_format: Literal["mp3", "m4b", "both"] = Field(
         default="mp3",
-        description="Output container: per-chapter MP3 files ('mp3') or a single M4B ('m4b').",
+        description=(
+            "Output container: per-chapter MP3 files ('mp3'), a single M4B audiobook "
+            "('m4b'), or both in one run ('both'). "
+            "'both' emits per-chapter MP3 files (with ID3 tags and cover art) AND a "
+            "single M4B (with chapter markers, tags, and cover) from the same "
+            "synthesized and loudness-normalised audio, reusing intermediate files. "
+            "The conversion report for 'both' carries per-chapter MP3 output_paths AND "
+            "a book-level output_path (M4B) plus chapter_markers."
+        ),
+    )
+    provider: str = Field(
+        default="kokoro",
+        description=(
+            "TTS provider adapter to use. "
+            "Only 'kokoro' is selectable in Milestone 12; OpenAI, Gemini, Azure, and "
+            "ElevenLabs adapters exist as stubs and will be added to the supported set "
+            "in future milestones when promoted to full implementations. "
+            "Provider selection is wired minimally in M12 and expands as stubs are "
+            "implemented (see docs/decisions/007-output-both-and-config.md)."
+        ),
+    )
+    scene_analysis: bool = Field(
+        default=True,
+        description=(
+            "Group chapter text into scenes for per-scene narration direction. "
+            "When True (default), the Narration Director splits each chapter into "
+            "scenes and applies one default NarrationDirection per scene, with local "
+            "overrides only when emotion/intensity changes significantly. "
+            "When False, the Director treats each chapter as a single scene "
+            "(one default direction), while all other annotation — dialogue detection, "
+            "emphasis hints, pause timing, and pronunciation hints — still applies."
+        ),
     )
     bitrate: str = Field(default="96k", description="MP3 output bitrate (e.g. '96k').")
     sample_rate: int = Field(default=24000, description="Audio sample rate in Hz.")
@@ -60,9 +105,36 @@ class Settings(BaseSettings):
     @field_validator("output_format", mode="before")
     @classmethod
     def normalize_output_format(cls, v: Any) -> Any:
-        """Lower-case and strip the output format so 'MP3'/'M4B' are accepted."""
+        """Lower-case and strip the output format so 'MP3'/'M4B'/'BOTH' are accepted."""
         if isinstance(v, str):
             return v.strip().lower()
+        return v
+
+    @field_validator("provider", mode="before")
+    @classmethod
+    def validate_provider(cls, v: Any) -> Any:
+        """Lower-case and strip the provider name; reject unsupported providers.
+
+        Only providers listed in ``_SUPPORTED_PROVIDERS`` are accepted.  In
+        Milestone 12 that set contains only ``"kokoro"``.  OpenAI, Gemini, Azure,
+        and ElevenLabs adapters exist as stubs; they will be added to
+        ``_SUPPORTED_PROVIDERS`` in future milestones when each stub is promoted
+        to a full implementation.
+
+        Provider selection is intentionally restrictive: advertising a provider
+        the user cannot actually use would produce a confusing runtime error
+        deep in the pipeline rather than a clear validation failure here.
+        """
+        if isinstance(v, str):
+            v = v.strip().lower()
+        if v not in _SUPPORTED_PROVIDERS:
+            supported = ", ".join(sorted(_SUPPORTED_PROVIDERS))
+            raise ValueError(
+                f"Unsupported TTS provider {v!r}. "
+                f"Supported providers: {supported}. "
+                "OpenAI, Gemini, Azure, and ElevenLabs adapters are stubs "
+                "and are not yet selectable."
+            )
         return v
 
     @field_validator("bitrate")

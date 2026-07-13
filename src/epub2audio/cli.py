@@ -243,9 +243,10 @@ def convert(
     # Build settings                                                       #
     # ------------------------------------------------------------------ #
     fmt = output_format.strip().lower()
-    if fmt not in ("mp3", "m4b"):
+    if fmt not in ("mp3", "m4b", "both"):
         _err_console.print(
-            f"[red]Error:[/red] invalid --format {output_format!r} (expected 'mp3' or 'm4b')."
+            f"[red]Error:[/red] invalid --format {output_format!r} "
+            "(expected 'mp3', 'm4b', or 'both')."
         )
         raise typer.Exit(code=1)
 
@@ -361,6 +362,21 @@ def convert(
                 )
             else:
                 _console.print("\n[red]M4B assembly did not produce an output file.[/red]")
+        elif settings.output_format == "both":
+            successful = sum(1 for r in report.chapter_results if r.output_path is not None)
+            failed = len(report.chapter_results) - successful
+            _console.print(
+                f"\n[green]Done.[/green] {successful} MP3 chapter(s) converted"
+                + (f", [red]{failed} failed[/red]" if failed else "")
+                + "."
+            )
+            if report.output_path is not None:
+                _console.print(
+                    f"[green]M4B:[/green] [bold]{report.output_path}[/bold] "
+                    f"({len(report.chapter_markers)} chapter(s))."
+                )
+            else:
+                _console.print("[red]M4B assembly did not produce an output file.[/red]")
         else:
             successful = sum(1 for r in report.chapter_results if r.output_path is not None)
             failed = len(report.chapter_results) - successful

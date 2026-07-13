@@ -131,17 +131,38 @@ def _build_segment(
     )
 
 
+def _collapse_scenes(scene_parts: list[str]) -> list[str]:
+    """Collapse divider-stripped scene parts into a single scene.
+
+    Used when scene analysis is disabled: the scene-divider lines have already
+    been removed by :func:`~epub2audio.director.scenes.split_scenes`, and the
+    remaining paragraphs are rejoined into one scene string so the whole
+    chapter receives a single default direction.
+
+    Args:
+        scene_parts: The divider-stripped scene strings from ``split_scenes``.
+
+    Returns:
+        A single-element list (or empty list when there is no narration text).
+    """
+    if not scene_parts:
+        return []
+    return ["\n\n".join(scene_parts)]
+
+
 def build_narration_plan(
     chapter_text: str,
     chapter_index: int,
+    *,
     lexicon: PronunciationLexicon | None = None,
+    scene_analysis: bool = True,
 ) -> list[NarrationPlan]:
     """Build one narration plan per scene for a chapter.
 
     Pipeline:
 
     1. Normalize the chapter text.
-    2. Split it into scenes (:func:`~epub2audio.director.scenes.split_scenes`).
+    2. Optionally split it into scenes (:func:`~epub2audio.director.scenes.split_scenes`).
     3. For each scene, derive a scene-level :class:`NarrationDirection` from
        deterministic text signals, then segment the scene and direct each
        segment (dialogue/speaker, emphasis, pause, optional intensity override,
@@ -155,13 +176,28 @@ def build_narration_plan(
             used to resolve pronunciation hints for each segment.  When
             ``None`` (the default), ``pronunciation_hints`` is always empty
             and all existing callers are unaffected.
+        scene_analysis: When ``True`` (the default), the chapter is split into
+            scenes via :func:`~epub2audio.director.scenes.split_scenes` and
+            one :class:`~epub2audio.models.NarrationPlan` is emitted per
+            non-empty scene.  When ``False``, the entire normalised chapter is
+            treated as a single scene (one plan, ``scene=1``) with one
+            ``default_direction`` computed over the whole chapter.  All other
+            annotation — dialogue detection, emphasis hints, pause timing, and
+            pronunciation hints — still applies.  Only scene-splitting is
+            skipped.  Per ADR-007.
 
     Returns:
-        An ordered list of :class:`NarrationPlan`, one per non-empty scene.
+        An ordered list of :class:`NarrationPlan`, one per non-empty scene
+        (always exactly one plan when *scene_analysis* is ``False``).
         Empty or whitespace-only input yields an empty list.
     """
     normalized = normalize_text(chapter_text)
-    scene_texts = scenes.split_scenes(normalized)
+    # `split_scenes` also strips scene-divider lines (e.g. "* * *"), which are
+    # never narration.  When scene analysis is disabled we still remove those
+    # dividers, then collapse everything into a single scene so the chapter
+    # gets one default direction.
+    scene_parts = scenes.split_scenes(normalized)
+    scene_texts = scene_parts if scene_analysis else _collapse_scenes(scene_parts)
 
     plans: list[NarrationPlan] = []
     scene_number = 0
