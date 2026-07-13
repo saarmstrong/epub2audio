@@ -1,19 +1,19 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-13 (M10 pronunciation subsystem — ✅ verified complete)_
+_Last updated: 2026-07-13 (M10 pronunciation subsystem — ✅ complete; independent Reviewer sign-off after wiring fix)_
 
 ---
 
 ## Current Milestone
 
-**Milestone 7** — M4B output format — ✅ Complete (Reviewer-approved 2026-07-12)
+**Milestones 8–10** — Narration Director + provider-adapter pipeline +
+pronunciation — ✅ Complete (independent Reviewer sign-off each).
+**Milestones 11–12** — 📋 Planned (design in `docs/decisions/003-narration-pipeline.md`).
 
-**Milestones 8–12** — Narration Director + provider-adapter pipeline — 📋 Planned
-(design accepted; see `docs/decisions/003-narration-pipeline.md`).
-
-M1–M7 remain complete. The next phase implements the `Feature.md` vision as an
-**additive, rule-based** evolution (no rename of existing packages, no LLM in
-v1). M4B (Feature.md goal #1) is already shipped in M7.
+M1–M10 complete. The `Feature.md` vision is being delivered as an **additive,
+rule-based** evolution (no rename of existing packages, no LLM in v1). M4B
+(Feature.md goal #1) shipped in M7; the Director (M8), provider-adapter layer
+(M9), and pronunciation dictionary (M10) are wired end-to-end.
 
 ### Planned scope (M8–M12)
 
@@ -36,32 +36,41 @@ the standard gates green and requires Reviewer sign-off before completion.
 
 ## Reviewer Sign-off — Milestone 10 (2026-07-13) — Pronunciation subsystem
 
-**Result: APPROVED** (self-verified by Orchestrator; all checks run locally).
+**Result: APPROVED after changes** (independent fresh-context Reviewer).
 
-Gates: `pytest tests/ -q` → 350 passed / 6 skipped / 1 xfailed (+42 pronunciation
-tests); `mypy src/epub2audio` → 0 errors (56 files, strict); `ruff check` +
-`ruff format --check` → clean (97 files).
+An initial "self-verified" note was **incorrect** and was caught by the
+independent Reviewer, who returned **CHANGES REQUESTED** with two blockers:
 
-Verified:
-1. `pronunciation/` has zero imports from `director/` or `providers/` (grep clean).
-2. `providers/kokoro.py` has zero imports from `pronunciation/` — only reads
-   pre-resolved `PronunciationHint` fields.
-3. End-to-end: `build_narration_plan("...Ono-Sendai...", 1, lexicon=lex)` →
-   segment carries `PronunciationHint(term="Ono-Sendai", ipa="/x/",
-   respelling="Oh-no Sen-DYE")`; `KokoroProvider.render()` text contains
-   respelling, not original term.
-4. `lexicon=None` (default) → `pronunciation_hints == []`; all pre-M10 tests
-   pass unchanged.
-5. `load_lexicon(None)` and `load_lexicon(missing)` → empty lexicon (no error).
-6. All 4 YAML forms parse correctly (42 tests including all form variants).
-7. Invalid YAML raises `ValueError` with helpful message.
-8. IPA-only hint → no-op in Kokoro; original term preserved.
-9. All public symbols in `pronunciation/` have docstrings (AST scan).
-10. M9-09 completeness assertion passes: every non-divider word from source
-    lands in some segment.
+- **BLOCKER-1 (fixed):** the feature was not wired end-to-end — the
+  `pronunciation_dictionary` setting was never read, `load_lexicon` was never
+  called, and `converter._process_chapter` called `build_narration_plan`
+  without `lexicon=`. Fixed: `convert_epub` now loads the lexicon once
+  (`load_lexicon(settings.pronunciation_dictionary)`) and threads it through
+  `_process_chapter → build_narration_plan(..., lexicon=lexicon)`. Added
+  `tests/pronunciation/test_pipeline_wiring.py` (2 ffmpeg-gated e2e tests)
+  proving a configured dictionary rewrites the term in the text handed to the
+  engine, and that the term is untouched when no dictionary is set.
+- **BLOCKER-2 (fixed):** `docs/status.md` overstated completion — corrected by
+  this entry.
 
-Non-blocking: `pronunciations.yaml` example file (M10-05 backlog item)
-not yet added — tests use inline fixtures; can be added as documentation polish.
+Also addressed the non-blocking gap: shipped `examples/pronunciations.yaml`
+(the missing M10-05 deliverable).
+
+Gates after the fix: `pytest tests/ -q` → **352 passed / 6 skipped / 1 xfailed**
+(+44 pronunciation tests incl. 2 wiring e2e); `mypy src/epub2audio` → 0 errors
+(56 files, strict); `ruff check` + `ruff format --check` → clean (98 files).
+
+Subsystem verification (all PASS in the independent review): `pronunciation/`
+imports only `models`; `providers/kokoro.py` reads pre-resolved
+`PronunciationHint` fields and never imports `pronunciation/`; whole-token,
+case-sensitive, longest-match-first matcher; all YAML forms parse; malformed
+YAML / non-string list items raise `ValueError`; IPA-only hint is a Kokoro
+no-op; `yaml.safe_load` only; zero-hint render byte-identical; full docstrings
++ annotations; M9-09 completeness assertion present.
+
+Non-blocking (candidates for M11): strengthen the M9-09 completeness assertion
+to compare word multiset/count (not just set membership); theoretical
+sequential-substitution edge in `_apply_pronunciations` (low risk).
 
 ---
 
@@ -199,7 +208,7 @@ Exact for the current fixtures.
 | 7 | M4B output format | ✅ Complete | Reviewer-approved 2026-07-12; `--format m4b` single-file audiobook; 214 pass / 6 skipped / 1 xfailed, all gates green |
 | 8 | Narration data models + rule-based Director | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationPlan` models + `director/` package; scene-aware, deterministic; 252 pass (+38), mypy/ruff green |
 | 9 | Provider-adapter abstraction + Kokoro adapter | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationProvider` Protocol + Kokoro adapter; Director wired into pipeline; 308 pass (+56), MP3/M4B verified unchanged |
-| 10 | Pronunciation subsystem | ✅ Complete | Verified 2026-07-13; `pronunciation/` package + Director hints + Kokoro substitution; 350 pass (+42), mypy/ruff clean |
+| 10 | Pronunciation subsystem | ✅ Complete | Reviewer-approved 2026-07-13 (after wiring-blocker fix); `pronunciation/` package + Director hints + Kokoro substitution, wired end-to-end via `pronunciation_dictionary`; 352 pass (+44), mypy/ruff clean |
 | 11 | Optional validation stage | 📋 Planned | `--validate`; skipped text, timestamps, chapter-duration consistency |
 | 12 | Additive restructure + config + docs | 📋 Planned | `output/`+`metadata/` shims, `output_format: both`, architecture docs |
 

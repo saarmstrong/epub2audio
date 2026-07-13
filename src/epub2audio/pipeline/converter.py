@@ -75,6 +75,7 @@ from epub2audio.pipeline.resume import (
     segment_needs_synthesis,
     tts_config_changed,
 )
+from epub2audio.pronunciation import PronunciationLexicon, load_lexicon
 from epub2audio.providers.base import NarrationProvider
 from epub2audio.text.normalize import normalize_text
 from epub2audio.utils.names import sanitize_book_filename, sanitize_filename
@@ -225,6 +226,7 @@ def _process_chapter(
     work_root: Path,
     settings: Settings,
     provider: NarrationProvider,
+    lexicon: PronunciationLexicon,
     manifest: ConversionManifest,
     cover_bytes: bytes | None,
 ) -> tuple[ChapterResult, list[TextSegment]]:
@@ -244,6 +246,8 @@ def _process_chapter(
         work_root: Persistent root work directory (``.epub2audio-work/``).
         settings: Effective settings.
         provider: Injected :class:`~epub2audio.providers.base.NarrationProvider`.
+        lexicon: Pronunciation lexicon (empty when no dictionary is configured)
+            passed to the Director so it can emit pronunciation hints.
         manifest: Current manifest (used for segment resume checking).
         cover_bytes: Optional cover art bytes to embed.
 
@@ -271,7 +275,7 @@ def _process_chapter(
             [],
         )
 
-    plans = build_narration_plan(raw_text, chapter_index)
+    plans = build_narration_plan(raw_text, chapter_index, lexicon=lexicon)
     flat_segments = _flatten_plan(plans)
 
     if not flat_segments:
@@ -511,6 +515,14 @@ def convert_epub(
     book = open_epub(epub_path)
     cover_bytes = extract_cover(book)
 
+    # Load the pronunciation lexicon once (empty when none is configured).
+    lexicon = load_lexicon(settings.pronunciation_dictionary)
+    if settings.pronunciation_dictionary is not None:
+        log.info(
+            "Loaded pronunciation dictionary from %s.",
+            settings.pronunciation_dictionary,
+        )
+
     # ------------------------------------------------------------------ #
     # Manifest: load existing or create fresh                              #
     # ------------------------------------------------------------------ #
@@ -589,6 +601,7 @@ def convert_epub(
                 work_root=work_root,
                 settings=settings,
                 provider=provider,
+                lexicon=lexicon,
                 manifest=manifest,
                 cover_bytes=cover_bytes,
             )
