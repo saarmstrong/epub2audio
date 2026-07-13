@@ -32,6 +32,7 @@ import pytest
 
 from epub2audio.config import Settings
 from epub2audio.pipeline.converter import convert_epub
+from epub2audio.providers.kokoro import KokoroProvider
 from epub2audio.tts.fake import FakeTTSEngine
 
 # CountingFakeTTSEngine is defined in tests/pipeline/conftest.py but we
@@ -83,7 +84,7 @@ def test_resume_skips_completed_segments(
     # First run — synthesize everything, preserve WAVs
     engine1 = CountingFakeTTSEngine()
     settings = _default_settings(tmp_path, keep_intermediates=True, resume=True)
-    report1 = convert_epub(simple_epub3_path, tmp_path, settings, engine1)
+    report1 = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(engine1))
     assert report1.errors == [], f"First run had errors: {report1.errors}"
     assert engine1.call_count > 0, "First run should synthesize at least one segment"
 
@@ -91,7 +92,7 @@ def test_resume_skips_completed_segments(
 
     # Second run — everything cached, no synthesis expected
     engine2 = CountingFakeTTSEngine()
-    report2 = convert_epub(simple_epub3_path, tmp_path, settings, engine2)
+    report2 = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(engine2))
     assert report2.errors == [], f"Second run had errors: {report2.errors}"
     assert engine2.call_count == 0, (
         f"Second run (resume) should synthesize 0 segments, "
@@ -116,7 +117,7 @@ def test_resume_reuses_segment_wavs_without_modifying_them(
     engine = FakeTTSEngine()
 
     # First run
-    report1 = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    report1 = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(engine))
     assert report1.errors == []
 
     work_root = tmp_path / ".epub2audio-work"
@@ -127,7 +128,7 @@ def test_resume_reuses_segment_wavs_without_modifying_them(
     mtimes_before = {p: p.stat().st_mtime for p in seg_wavs}
 
     # Second run
-    report2 = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    report2 = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(engine))
     assert report2.errors == []
 
     for wav_path in seg_wavs:
@@ -157,7 +158,7 @@ def test_full_conversion_cleans_work_dir(
     settings = _default_settings(tmp_path, keep_intermediates=False)
     engine = FakeTTSEngine()
 
-    report = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    report = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(engine))
     assert report.errors == []
 
     work_root = tmp_path / ".epub2audio-work"
@@ -181,7 +182,7 @@ def test_keep_intermediates_preserves_work_dir(
     settings = _default_settings(tmp_path, keep_intermediates=True)
     engine = FakeTTSEngine()
 
-    report = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    report = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(engine))
     assert report.errors == []
 
     work_root = tmp_path / ".epub2audio-work"
@@ -213,7 +214,7 @@ def test_voice_change_invalidates_segments(
     # First run with voice=af_heart
     engine1 = CountingFakeTTSEngine()
     s1 = _default_settings(tmp_path, voice="af_heart", keep_intermediates=True, resume=True)
-    report1 = convert_epub(simple_epub3_path, tmp_path, s1, engine1)
+    report1 = convert_epub(simple_epub3_path, tmp_path, s1, KokoroProvider(engine1))
     assert report1.errors == []
     first_run_calls = engine1.call_count
     assert first_run_calls > 0, "First run must synthesize at least one segment"
@@ -221,7 +222,7 @@ def test_voice_change_invalidates_segments(
     # Second run with voice=af_bella (different voice — TTS-affecting change)
     engine2 = CountingFakeTTSEngine()
     s2 = _default_settings(tmp_path, voice="af_bella", keep_intermediates=True, resume=True)
-    report2 = convert_epub(simple_epub3_path, tmp_path, s2, engine2)
+    report2 = convert_epub(simple_epub3_path, tmp_path, s2, KokoroProvider(engine2))
     assert report2.errors == []
 
     assert engine2.call_count == first_run_calls, (
@@ -245,7 +246,7 @@ def test_speed_change_invalidates_segments(
     # First run at speed=1.0
     engine1 = CountingFakeTTSEngine()
     s1 = _default_settings(tmp_path, speed=1.0, keep_intermediates=True, resume=True)
-    report1 = convert_epub(simple_epub3_path, tmp_path, s1, engine1)
+    report1 = convert_epub(simple_epub3_path, tmp_path, s1, KokoroProvider(engine1))
     assert report1.errors == []
     first_run_calls = engine1.call_count
     assert first_run_calls > 0
@@ -253,7 +254,7 @@ def test_speed_change_invalidates_segments(
     # Second run at speed=1.25 (TTS-affecting change)
     engine2 = CountingFakeTTSEngine()
     s2 = _default_settings(tmp_path, speed=1.25, keep_intermediates=True, resume=True)
-    report2 = convert_epub(simple_epub3_path, tmp_path, s2, engine2)
+    report2 = convert_epub(simple_epub3_path, tmp_path, s2, KokoroProvider(engine2))
     assert report2.errors == []
 
     assert engine2.call_count == first_run_calls, (
@@ -290,7 +291,7 @@ def test_bitrate_change_keeps_segments(
     # First run at bitrate=96k
     engine1 = CountingFakeTTSEngine()
     s1 = _default_settings(tmp_path, bitrate="96k", keep_intermediates=True, resume=True)
-    report1 = convert_epub(simple_epub3_path, tmp_path, s1, engine1)
+    report1 = convert_epub(simple_epub3_path, tmp_path, s1, KokoroProvider(engine1))
     assert report1.errors == []
     first_run_calls = engine1.call_count
     assert first_run_calls > 0
@@ -298,7 +299,7 @@ def test_bitrate_change_keeps_segments(
     # Second run at bitrate=128k — only MP3 encoding should re-run, not TTS
     engine2 = CountingFakeTTSEngine()
     s2 = _default_settings(tmp_path, bitrate="128k", keep_intermediates=True, resume=True)
-    report2 = convert_epub(simple_epub3_path, tmp_path, s2, engine2)
+    report2 = convert_epub(simple_epub3_path, tmp_path, s2, KokoroProvider(engine2))
     assert report2.errors == []
 
     # Once two-tier invalidation is implemented, TTS call count should be 0
@@ -329,7 +330,7 @@ def test_manifest_segments_populated_with_audio_path(
     settings = _default_settings(tmp_path, keep_intermediates=True)
     engine = FakeTTSEngine()
 
-    report = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    report = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(engine))
     assert report.errors == []
 
     manifest_path = tmp_path / "manifest.json"
@@ -363,7 +364,7 @@ def test_manifest_cleared_segment_cache_on_config_change(
     # First run
     settings1 = _default_settings(tmp_path, voice="af_heart", keep_intermediates=True, resume=True)
     engine1 = FakeTTSEngine()
-    report1 = convert_epub(simple_epub3_path, tmp_path, settings1, engine1)
+    report1 = convert_epub(simple_epub3_path, tmp_path, settings1, KokoroProvider(engine1))
     assert report1.errors == []
     manifest_after_run1 = read_manifest(tmp_path / "manifest.json")
     seg_hashes_run1 = {s.normalized_hash for s in manifest_after_run1.segments}
@@ -372,7 +373,7 @@ def test_manifest_cleared_segment_cache_on_config_change(
     # Second run with different voice (config change)
     settings2 = _default_settings(tmp_path, voice="af_bella", keep_intermediates=True, resume=True)
     engine2 = FakeTTSEngine()
-    report2 = convert_epub(simple_epub3_path, tmp_path, settings2, engine2)
+    report2 = convert_epub(simple_epub3_path, tmp_path, settings2, KokoroProvider(engine2))
     assert report2.errors == []
     manifest_after_run2 = read_manifest(tmp_path / "manifest.json")
 

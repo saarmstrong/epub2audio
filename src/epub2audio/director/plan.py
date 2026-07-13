@@ -21,6 +21,7 @@ from epub2audio.models import (
     NarrationDirection,
     NarrationPlan,
     NarrationSegment,
+    TextSegment,
 )
 from epub2audio.text.normalize import normalize_text
 from epub2audio.text.pauses import get_pause
@@ -59,22 +60,31 @@ def _pause_after_ms(current_text: str, is_last_in_scene: bool) -> int:
 
     Reuses the shared boundary-classification rules in
     :func:`~epub2audio.text.pauses.get_pause` (via the segment's trailing
-    punctuation).  The final segment of a scene is given at least a scene-gap
-    pause so scene changes are audible.
+    punctuation).  A minimal :class:`~epub2audio.models.TextSegment` is
+    constructed directly from *current_text* — the text is already a
+    segment, so there is no need to re-run :func:`~epub2audio.text.segment
+    .segment_text`.  The final segment of a scene is given at least a
+    scene-gap pause so scene changes are audible.
 
     Args:
         current_text: The text of the segment the pause follows.
         is_last_in_scene: Whether this is the last segment of its scene.
 
     Returns:
-        Pause duration in milliseconds (\u2265 0).
+        Pause duration in milliseconds (≥ 0).
     """
-    # segment_text always yields exactly one segment for a single short chunk.
-    seg = segment_text(current_text) or None
-    base = 0
-    if seg:
-        spec = get_pause(seg[0], seg[0])
-        base = spec.duration_ms if spec is not None else 0
+    # Build a minimal TextSegment so get_pause can classify the trailing
+    # punctuation.  Hashes and word_count are not used by get_pause.
+    stub = TextSegment(
+        text=current_text,
+        source_hash="",
+        normalized_hash="",
+        word_count=0,
+        status="pending",
+        audio_path=None,
+    )
+    spec = get_pause(stub, stub)
+    base = spec.duration_ms if spec is not None else 0
     if is_last_in_scene:
         return max(base, _SCENE_GAP_MS)
     return base

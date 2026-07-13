@@ -292,24 +292,23 @@ def convert(
         return
 
     # ------------------------------------------------------------------ #
-    # TTS engine selection                                                 #
+    # Provider selection                                                   #
     # ------------------------------------------------------------------ #
-    from epub2audio.tts.base import TTSEngine
+    from epub2audio.providers.base import NarrationProvider
+    from epub2audio.providers.kokoro import KokoroProvider, build_kokoro_provider
 
-    tts_engine: TTSEngine
+    provider: NarrationProvider
     try:
-        from epub2audio.tts.kokoro import KokoroTTSEngine
         from epub2audio.tts.voices import get_lang_code
 
-        # Get the lang_code for the configured language
         lang_code = get_lang_code(settings.language)
-        tts_engine = KokoroTTSEngine(lang_code=lang_code)
+        provider = build_kokoro_provider(lang_code)
         if not quiet:
             _console.print("[green]Using Kokoro TTS engine.[/green]")
     except Exception as exc:
         from epub2audio.tts.fake import FakeTTSEngine
 
-        tts_engine = FakeTTSEngine()
+        provider = KokoroProvider(FakeTTSEngine())
         if not quiet:
             _console.print(
                 f"[yellow]Kokoro not available ({type(exc).__name__}: {exc}) — "
@@ -333,7 +332,7 @@ def convert(
             epub_path=epub_path,
             output_dir=output,
             settings=settings,
-            tts_engine=tts_engine,
+            provider=provider,
             plan=filtered_plan,
         )
     except MissingDependencyError as exc:

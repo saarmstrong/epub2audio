@@ -10,6 +10,7 @@ provider adapter's job.
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from epub2audio.models import EmphasisHint
 
@@ -42,12 +43,12 @@ def extract_emphasis(text: str) -> list[EmphasisHint]:
     hints: list[EmphasisHint] = []
     seen: set[str] = set()
 
-    def _add(phrase: str, level: str) -> None:
+    def _add(phrase: str, level: Literal["light", "moderate", "strong"]) -> None:
         phrase = phrase.strip()
         if not phrase or phrase in seen:
             return
         seen.add(phrase)
-        hints.append(EmphasisHint(phrase=phrase, level=level))  # type: ignore[arg-type]
+        hints.append(EmphasisHint(phrase=phrase, level=level))
 
     for match in _CAPS_RE.finditer(text):
         _add(match.group(0), "strong")
