@@ -29,6 +29,32 @@ def _epub_type_value(tag: bs4.Tag) -> str:
     return str(val).lower()
 
 
+# Footnote/endnote reference marker text: only digits and common note symbols
+# (asterisk, dagger, double-dagger, section, parallel, pilcrow), optionally in
+# brackets/parentheses.  Used to detect reference markers that must not be read.
+_MARKER_TEXT_RE = re.compile(r"^[\s\[\](){}]*[\d*\u2020\u2021\u00a7\u2016\u00b6]+[\s\[\](){}]*$")
+
+# href substrings that indicate an anchor targets a foot/endnote.
+_NOTE_HREF_RE = re.compile(r"(?:^|[/#])(?:fn|note|footnote|endnote|ftn|en)\d", re.IGNORECASE)
+
+
+def _is_marker_text(text: str) -> bool:
+    """Return True if *text* is only a footnote/endnote marker (number/symbol).
+
+    Empty or whitespace-only text is not a marker.  Alphabetic content (e.g.
+    the ``th`` in an ordinal ``19th``) is never treated as a marker.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    return bool(_MARKER_TEXT_RE.match(stripped))
+
+
+def _is_note_href(href: str) -> bool:
+    """Return True if *href* points at a footnote/endnote target."""
+    return bool(_NOTE_HREF_RE.search(href))
+
+
 def _extract_fragment(
     body: bs4.Tag,
     start_fragment: str,
@@ -148,10 +174,17 @@ def xhtml_to_text(
     for tag in body.find_all(["script", "style", "nav"]):
         tag.decompose()
 
-    # 2. Strip footnote references (inline anchors pointing to footnotes).
+    # 2. Strip footnote/endnote reference anchors.  In addition to the semantic
+    #    ``epub:type="noteref"`` marker, many EPUBs use a plain anchor whose
+    #    href points at a note (e.g. ``href="notes.xhtml#fn3"``) and whose
+    #    visible text is just a number or symbol.  Reading those markers aloud
+    #    ("three", "star") breaks natural narration, so we drop them too.
     for tag in body.find_all("a"):
         epub_type = _epub_type_value(tag)
-        if "noteref" in epub_type:
+        href = tag.get("href", "")
+        if isinstance(href, list):
+            href = " ".join(href)
+        if "noteref" in epub_type or (_is_note_href(href) and _is_marker_text(tag.get_text())):
             tag.decompose()
 
     # 3. Strip footnote content asides (deferred to M5 for inline/end modes).
@@ -159,6 +192,15 @@ def xhtml_to_text(
         epub_type = _epub_type_value(tag)
         if "footnote" in epub_type:
             tag.decompose()
+
+    # 3b. Strip superscript footnote/endnote markers.  A ``<sup>`` that holds a
+    #     link, or whose text is only digits / footnote symbols (* † ‡ § ‖ ¶),
+    #     is a reference marker, not narration — remove it so the number/symbol
+    #     is never spoken.  Superscripts containing letters (ordinals such as
+    #     "19th") are preserved.
+    for sup in body.find_all("sup"):
+        if sup.find("a") is not None or _is_marker_text(sup.get_text()):
+            sup.decompose()
 
     # 4. Replace <br> with newline placeholder before text extraction.
     for br in body.find_all("br"):
