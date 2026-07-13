@@ -467,12 +467,15 @@ class TestValidateConversion:
         assert vr.info_count == sum(1 for i in vr.issues if i.severity == "info")
 
     def test_import_boundary(self) -> None:
-        """validation.checks must not import epub/, director/, providers/, tts/."""
+        """All .py files in validation/ must not import forbidden domains.
+
+        M12-08: broadened from checks.py-only + ImportFrom-only to cover every
+        .py file in the package (including __init__.py) and BOTH ``import x``
+        (ast.Import) and ``from x import y`` (ast.ImportFrom) node forms.
+        """
         import ast
         import pathlib
 
-        src = pathlib.Path("src/epub2audio/validation/checks.py").read_text()
-        tree = ast.parse(src)
         forbidden = {
             "epub2audio.epub",
             "epub2audio.director",
@@ -481,12 +484,28 @@ class TestValidateConversion:
             "epub2audio.audio",
             "epub2audio.pipeline",
         }
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module:
-                for prefix in forbidden:
-                    assert not node.module.startswith(prefix), (
-                        f"validation/checks.py must not import from {prefix}, found: {node.module}"
-                    )
+
+        validation_dir = pathlib.Path("src/epub2audio/validation")
+        py_files = sorted(validation_dir.glob("*.py"))
+        assert py_files, f"No .py files found under {validation_dir}"
+
+        for py_file in py_files:
+            src = py_file.read_text()
+            tree = ast.parse(src)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    for prefix in forbidden:
+                        assert not node.module.startswith(prefix), (
+                            f"{py_file.name}: must not `from {prefix}...` import, "
+                            f"found: {node.module}"
+                        )
+                elif isinstance(node, ast.Import):
+                    for alias in node.names:
+                        for prefix in forbidden:
+                            assert not alias.name.startswith(prefix), (
+                                f"{py_file.name}: must not `import {prefix}...`, "
+                                f"found: {alias.name}"
+                            )
 
 
 # ---------------------------------------------------------------------------
