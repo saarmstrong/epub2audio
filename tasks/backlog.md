@@ -121,12 +121,12 @@ then to `tasks/completed/` when done and reviewed.
 
 _Design: `docs/decisions/003-narration-pipeline.md`. Rule-based (deterministic, no LLM), additive._
 
-- [ ] `M8-01` — Architect: add `NarrationDirection`, `NarrationSegment`, `NarrationPlan` to `models.py` (frozen Pydantic, matching Feature.md JSON shape)
-- [ ] `M8-02` — TTS Engineer: create `director/` package with rule-based `build_narration_plan(chapter_text, chapter_index) -> NarrationPlan`
-- [ ] `M8-03` — TTS Engineer: scene grouping + one `default_direction` per scene; local overrides only on significant emotion/intensity change
-- [ ] `M8-04` — TTS Engineer: dialogue detection + likely-speaker labelling (quote/attribution heuristics); reuse `text/segment.py`
-- [ ] `M8-05` — TTS Engineer: fold `text/pauses.py` pause timing + emphasis hints into plan segments; never rewrite prose
-- [ ] `M8-06` — Tester: `tests/director/` unit tests for narration plans (deliverable #7) incl. "text preserved / no invented dialogue" assertions
+- [x] `M8-01` — Architect: add `NarrationDirection`, `NarrationSegment`, `NarrationPlan` to `models.py` (frozen Pydantic, matching Feature.md JSON shape)
+- [x] `M8-02` — TTS Engineer: create `director/` package with rule-based `build_narration_plan(chapter_text, chapter_index) -> NarrationPlan`
+- [x] `M8-03` — TTS Engineer: scene grouping + one `default_direction` per scene; local overrides only on significant emotion/intensity change
+- [x] `M8-04` — TTS Engineer: dialogue detection + likely-speaker labelling (quote/attribution heuristics); reuse `text/segment.py`
+- [x] `M8-05` — TTS Engineer: fold `text/pauses.py` pause timing + emphasis hints into plan segments; never rewrite prose
+- [x] `M8-06` — Tester: `tests/director/` unit tests for narration plans (deliverable #7) incl. "text preserved / no invented dialogue" assertions
 - [ ] `M8-07` — Reviewer: verify plans are deterministic and provider-neutral (no SSML / engine tokens)
 
 ---

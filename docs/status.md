@@ -1,6 +1,6 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-12 (M8–M12 narration pipeline — planned; design accepted)_
+_Last updated: 2026-07-12 (M8 rule-based Narration Director — implemented; awaiting Reviewer sign-off)_
 
 ---
 
@@ -111,7 +111,7 @@ Exact for the current fixtures.
 | 5 | Chapter-detection hardening | ✅ Complete | Reviewer-approved 2026-07-12; detection layer done + 77 epub tests pass, all M5 gates green. Product wiring tracked as DEFECT-004 (M6 follow-up) |
 | 6 | Release readiness (docs, CI, packaging) | ✅ Complete | Reviewer-approved 2026-07-12; DEFECT-004 + DEFECT-005 fixed; README/CHANGELOG/LICENSE added; 204 pass / 6 skipped / 1 xfailed, all gates green |
 | 7 | M4B output format | ✅ Complete | Reviewer-approved 2026-07-12; `--format m4b` single-file audiobook; 214 pass / 6 skipped / 1 xfailed, all gates green |
-| 8 | Narration data models + rule-based Director | 📋 Planned | `docs/decisions/003-narration-pipeline.md`; `NarrationPlan` contract, deterministic scene-aware Director |
+| 8 | Narration data models + rule-based Director | 🔨 Implemented (awaiting review) | `NarrationPlan` models + `director/` package; scene-aware, deterministic; 252 pass (+38), mypy/ruff green |
 | 9 | Provider-adapter abstraction + Kokoro adapter | 📋 Planned | `NarrationProvider` Protocol; Kokoro wraps `KokoroTTSEngine`; MP3/M4B unchanged |
 | 10 | Pronunciation subsystem | 📋 Planned | `pronunciations.yaml` lexicon; Director hints, adapters apply |
 | 11 | Optional validation stage | 📋 Planned | `--validate`; skipped text, timestamps, chapter-duration consistency |
