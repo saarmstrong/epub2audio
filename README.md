@@ -4,14 +4,18 @@ Convert EPUB ebooks to MP3 audiobooks using Kokoro TTS.
 
 ## Features
 
-- **Two output formats** — one MP3 per logical chapter, or a single `.m4b` audiobook with embedded chapter markers (`--format m4b`)
-- **One MP3 per logical chapter** — automatic chapter detection from EPUB structure
+- **Three output formats** — `--format mp3` (one MP3 per chapter, default), `--format m4b` (single M4B with chapter markers), or `--format both` (MP3s + M4B in one run)
+- **Expressive narration** — Narration Director analyzes scenes, detects dialogue, attributes speakers, and sets pace/intensity per scene; never rewrites prose
+- **Provider-agnostic** — add a new TTS engine by implementing one Protocol (`NarrationProvider`); Kokoro is the built-in provider; OpenAI/Gemini/Azure/ElevenLabs stubs ready
+- **Pronunciation dictionary** — `pronunciations.yaml` for proper nouns, technical terms, invented words; provider-neutral hints applied per-adapter
+- **Optional validation** — `--validate` runs post-conversion quality checks and writes `validation-report.json`
+- **Automatic chapter detection** — from EPUB structure (TOC, spine, semantic markup, heading scoring)
 - **Multi-file chapter merging** — combines split chapters into single tracks
 - **Single-file chapter splitting** — separates combined chapters by TOC fragments
-- **Resume interrupted conversions** — pick up where you left off
+- **Resume interrupted conversions** — segment-level caching; pick up where you left off
 - **Configurable voice, speed, language** — 9 Kokoro voices available
-- **Cover art and metadata embedding** — ID3 tags with book info
-- **Loudness normalization** — EBU R128 standard (-18 LUFS)
+- **Cover art and metadata embedding** — ID3 tags (MP3) and book-level tags + cover (M4B)
+- **Loudness normalization** — EBU R128 standard (-18 LUFS, -2 dBTP)
 - **Local processing only** — no data sent to external services
 
 ## Installation
@@ -74,7 +78,9 @@ epub2audio doctor
 ### `convert` — Convert EPUB to audiobook
 
 With `--format mp3` (default) produces one MP3 per chapter. With `--format m4b`
-produces a single `.m4b` audiobook (AAC) with embedded chapter markers and cover art.
+produces a single `.m4b` audiobook (AAC) with embedded chapter markers and cover
+art. With `--format both`, produces both per-chapter MP3s and a single M4B in one
+run from the same audio (no re-synthesis).
 
 ```bash
 epub2audio convert BOOK.epub [OPTIONS]
@@ -84,7 +90,7 @@ Options:
   --voice TEXT             Kokoro voice [default: af_heart]
   --language TEXT          Language code [default: from EPUB or en-us]
   --speed FLOAT            Speech speed [default: 1.0]
-  --format TEXT            Output format: mp3 or m4b [default: mp3]
+  --format TEXT            Output format: mp3, m4b, or both [default: mp3]
   --bitrate TEXT           Audio bitrate [default: 96k]
   --sample-rate INT        Audio sample rate [default: 24000]
   --normalize / --no-normalize  Loudness normalization [default: enabled]
@@ -98,6 +104,8 @@ Options:
   --dry-run                Show plan without converting
   --keep-intermediates     Preserve intermediate WAV files
   --workers INT            Parallel workers [default: 1]
+  --validate               Run post-conversion quality checks; writes
+                           validation-report.json [default: disabled]
   --config PATH            Config file path
   --verbose, -v            Verbose output
   --quiet, -q              Minimal output
@@ -175,6 +183,78 @@ With `--format m4b`, a single file is written instead of per-chapter MP3s:
 ```
 audiobooks/
 └── Book Title.m4b        # single AAC audiobook with embedded chapter markers
+```
+
+With `--format both`, you get everything at once from a single synthesis pass:
+
+```
+audiobooks/
+├── 001 - Chapter One.mp3
+├── 002 - Chapter Two.mp3
+├── ...
+├── Book Title.m4b
+└── conversion-report.json
+```
+
+## Pronunciation Dictionary
+
+For proper nouns, technical terms, or invented words that Kokoro mispronounces,
+create a `pronunciations.yaml` file (see `examples/pronunciations.yaml`):
+
+```yaml
+pronunciations:
+  Ono-Sendai:
+    ipa: "ˈoʊnoʊ sɛnˈdaɪ"
+    respelling: "Oh-no Sen-DYE"
+  Tessier-Ashpool:
+    respelling: "Tess-ee-AY Ash-pool"
+  Hosaka: "Ho-SAH-kah"        # shorthand: bare string = respelling
+  Chiba: null                  # flag only; no substitution for Kokoro
+```
+
+Then reference it in your config or pass it on the command line:
+
+```toml
+# epub2audio.toml
+pronunciation_dictionary = "pronunciations.yaml"
+```
+
+## Post-Conversion Validation
+
+```bash
+epub2audio convert book.epub -o ./out --validate
+```
+
+Writes `validation-report.json` alongside `conversion-report.json`.  Checks
+include: missing chapters, skipped text, invalid metadata, M4B timestamp
+overlaps, chapter-duration anomalies, and missing output files.
+
+## Configuration
+
+All settings can be set in `epub2audio.toml` (see `examples/epub2audio.toml`):
+
+```toml
+# Output format: mp3, m4b, or both
+output_format = "mp3"
+
+# TTS provider (kokoro is the only built-in provider)
+provider = "kokoro"
+
+# Voice and language
+voice = "af_heart"
+language = "en-us"
+speed = 1.0
+
+# Audio quality
+bitrate = "96k"
+sample_rate = 24000
+normalize = true
+
+# Narration Director
+scene_analysis = true   # analyse scenes for direction; false = flat narration
+
+# Pronunciation
+pronunciation_dictionary = "pronunciations.yaml"  # optional
 ```
 
 ## Troubleshooting

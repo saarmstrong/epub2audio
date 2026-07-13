@@ -1,0 +1,73 @@
+# epub2audio example configuration file
+#
+# Copy to epub2audio.toml in your project directory (or to
+# ~/.config/epub2audio/config.toml for a user-wide default).
+# Settings here are overridden by CLI flags.
+#
+# All settings are optional; values shown are the application defaults
+# unless marked [optional — no default].
+
+# ---------------------------------------------------------------------------
+# TTS provider
+# ---------------------------------------------------------------------------
+# The TTS provider to use. Currently only "kokoro" is supported.
+provider = "kokoro"
+
+# Voice identifier. Available voices: af_heart, af_sky, af_alloy, af_aoede,
+# af_bella, af_jessica, af_nicole, am_adam, am_michael
+# (run `epub2audio voices` to see all).
+voice = "af_heart"
+
+# BCP-47 language tag.
+language = "en-us"
+
+# Speaking-rate multiplier: 1.0 is normal, <1.0 slower, >1.0 faster.
+speed = 1.0
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+# Output format: "mp3" (one MP3 per chapter), "m4b" (single audiobook file),
+# or "both" (produce both in one synthesis pass, no re-encoding).
+output_format = "mp3"
+
+# Output directory (overridden by --output / -o on the CLI).
+# output_dir = "./audiobooks"
+
+# MP3 bitrate. Common values: 64k, 96k, 128k, 192k.
+bitrate = "96k"
+
+# Audio sample rate in Hz. Kokoro's native rate is 24000.
+sample_rate = 24000
+
+# ---------------------------------------------------------------------------
+# Audio processing
+# ---------------------------------------------------------------------------
+# Apply EBU R128 loudness normalisation (-18 LUFS, -2 dBTP).
+normalize = true
+
+# ---------------------------------------------------------------------------
+# Narration Director
+# ---------------------------------------------------------------------------
+# Analyse chapters into scenes. When true, each scene gets its own default
+# direction (mood/pace/intensity). When false, each chapter is treated as a
+# single scene (scene-break divider lines are still stripped, never narrated).
+scene_analysis = true
+
+# ---------------------------------------------------------------------------
+# Pronunciation dictionary
+# ---------------------------------------------------------------------------
+# Path to a YAML file mapping terms to IPA / respellings.
+# See examples/pronunciations.yaml for the format.
+# [optional — uncomment and set a path to enable]
+# pronunciation_dictionary = "pronunciations.yaml"
+
+# ---------------------------------------------------------------------------
+# Resume and intermediates
+# ---------------------------------------------------------------------------
+# Resume interrupted conversions from cached segment WAVs.
+resume = true
+
+# Keep intermediate WAV files after a successful conversion.
+# Useful for debugging. Off by default.
+keep_intermediates = false
