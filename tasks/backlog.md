@@ -143,19 +143,18 @@ _Design: `docs/decisions/003-narration-pipeline.md`. Rule-based (deterministic, 
 _Carry-forward from M8 review (non-blocking):_
 - [x] `M9-07` — Tidy: `director/plan._pause_after_ms` re-segments an already-segmented `TextSegment`; pass the `TextSegment` to `get_pause` instead of re-running `segment_text`
 - [x] `M9-08` — Tidy: remove `# type: ignore[arg-type]` in `director/emphasis.py` by typing `_add(level: Literal["light","moderate","strong"])`
-- [ ] `M9-09` — Tester: add end-to-end **completeness** assertion (all non-divider narration text lands in some segment), not just substring containment
+- [x] `M9-09` — Tester: add end-to-end **completeness** assertion (all non-divider narration text lands in some segment), not just substring containment
 
 ---
 
 ## Milestone 10 — Pronunciation Subsystem
 
-- [ ] `M10-01` — TTS Engineer: `pronunciation/` — load `pronunciations.yaml` into a provider-neutral lexicon + matcher
-- [ ] `M10-02` — Architect: add YAML dependency; decision record if choice is non-trivial
-- [ ] `M10-03` — TTS Engineer: Director emits pronunciation hints; Kokoro adapter applies them
-- [ ] `M10-04` — `config.py`: add `pronunciation_dictionary` path setting
-- [ ] `M10-05` — Tester: lexicon load + application tests; example `pronunciations.yaml`
-- [ ] `M10-06` — Reviewer: verify hints are provider-neutral and applied only in adapters
-- [ ] `M9-09` (carried) — Tester: end-to-end **completeness** assertion (all non-divider narration text lands in some segment), not just substring containment
+- [x] `M10-01` — TTS Engineer: `pronunciation/` — load `pronunciations.yaml` into a provider-neutral lexicon + matcher
+- [x] `M10-02` — Architect: add YAML dependency; decision record if choice is non-trivial
+- [x] `M10-03` — TTS Engineer: Director emits pronunciation hints; Kokoro adapter applies them
+- [x] `M10-04` — `config.py`: add `pronunciation_dictionary` path setting
+- [x] `M10-05` — Tester: lexicon load + application tests; example `pronunciations.yaml`
+- [x] `M10-06` — Reviewer: verify hints are provider-neutral and applied only in adapters
 
 ---
 

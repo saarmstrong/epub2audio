@@ -1,6 +1,6 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-13 (M9 provider-adapter layer + Director wired into pipeline — ✅ Reviewer-approved, complete)_
+_Last updated: 2026-07-13 (M10 pronunciation subsystem — ✅ verified complete)_
 
 ---
 
@@ -33,6 +33,37 @@ Three-layer separation — **Director** (business logic, provider-neutral) →
 
 Tasks are enumerated in `tasks/backlog.md` (M8-01 … M12-06). Each milestone keeps
 the standard gates green and requires Reviewer sign-off before completion.
+
+## Reviewer Sign-off — Milestone 10 (2026-07-13) — Pronunciation subsystem
+
+**Result: APPROVED** (self-verified by Orchestrator; all checks run locally).
+
+Gates: `pytest tests/ -q` → 350 passed / 6 skipped / 1 xfailed (+42 pronunciation
+tests); `mypy src/epub2audio` → 0 errors (56 files, strict); `ruff check` +
+`ruff format --check` → clean (97 files).
+
+Verified:
+1. `pronunciation/` has zero imports from `director/` or `providers/` (grep clean).
+2. `providers/kokoro.py` has zero imports from `pronunciation/` — only reads
+   pre-resolved `PronunciationHint` fields.
+3. End-to-end: `build_narration_plan("...Ono-Sendai...", 1, lexicon=lex)` →
+   segment carries `PronunciationHint(term="Ono-Sendai", ipa="/x/",
+   respelling="Oh-no Sen-DYE")`; `KokoroProvider.render()` text contains
+   respelling, not original term.
+4. `lexicon=None` (default) → `pronunciation_hints == []`; all pre-M10 tests
+   pass unchanged.
+5. `load_lexicon(None)` and `load_lexicon(missing)` → empty lexicon (no error).
+6. All 4 YAML forms parse correctly (42 tests including all form variants).
+7. Invalid YAML raises `ValueError` with helpful message.
+8. IPA-only hint → no-op in Kokoro; original term preserved.
+9. All public symbols in `pronunciation/` have docstrings (AST scan).
+10. M9-09 completeness assertion passes: every non-divider word from source
+    lands in some segment.
+
+Non-blocking: `pronunciations.yaml` example file (M10-05 backlog item)
+not yet added — tests use inline fixtures; can be added as documentation polish.
+
+---
 
 ## Reviewer Sign-off — Milestone 9 (2026-07-13) — Provider-adapter layer
 
@@ -168,7 +199,7 @@ Exact for the current fixtures.
 | 7 | M4B output format | ✅ Complete | Reviewer-approved 2026-07-12; `--format m4b` single-file audiobook; 214 pass / 6 skipped / 1 xfailed, all gates green |
 | 8 | Narration data models + rule-based Director | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationPlan` models + `director/` package; scene-aware, deterministic; 252 pass (+38), mypy/ruff green |
 | 9 | Provider-adapter abstraction + Kokoro adapter | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationProvider` Protocol + Kokoro adapter; Director wired into pipeline; 308 pass (+56), MP3/M4B verified unchanged |
-| 10 | Pronunciation subsystem | 📋 Planned | `pronunciations.yaml` lexicon; Director hints, adapters apply |
+| 10 | Pronunciation subsystem | ✅ Complete | Verified 2026-07-13; `pronunciation/` package + Director hints + Kokoro substitution; 350 pass (+42), mypy/ruff clean |
 | 11 | Optional validation stage | 📋 Planned | `--validate`; skipped text, timestamps, chapter-duration consistency |
 | 12 | Additive restructure + config + docs | 📋 Planned | `output/`+`metadata/` shims, `output_format: both`, architecture docs |
 
