@@ -1,6 +1,6 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-12 (M7 M4B output format — Reviewer-approved, complete)_
+_Last updated: 2026-07-12 (M8–M12 narration pipeline — planned; design accepted)_
 
 ---
 
@@ -8,8 +8,31 @@ _Last updated: 2026-07-12 (M7 M4B output format — Reviewer-approved, complete)
 
 **Milestone 7** — M4B output format — ✅ Complete (Reviewer-approved 2026-07-12)
 
-M1–M6 remain complete. M7 adds a second output format (`--format m4b`) alongside
-the existing per-chapter MP3 output.
+**Milestones 8–12** — Narration Director + provider-adapter pipeline — 📋 Planned
+(design accepted; see `docs/decisions/003-narration-pipeline.md`).
+
+M1–M7 remain complete. The next phase implements the `Feature.md` vision as an
+**additive, rule-based** evolution (no rename of existing packages, no LLM in
+v1). M4B (Feature.md goal #1) is already shipped in M7.
+
+### Planned scope (M8–M12)
+
+Three-layer separation — **Director** (business logic, provider-neutral) →
+**Provider adapter** (mapping only) → **Engine** (raw TTS I/O):
+
+- **M8** — `NarrationDirection` / `NarrationSegment` / `NarrationPlan` models +
+  rule-based Director skeleton (scene-aware, deterministic, never rewrites prose).
+- **M9** — `NarrationProvider` Protocol + Kokoro adapter (wraps `KokoroTTSEngine`);
+  stub adapters for OpenAI / Gemini / Azure / ElevenLabs. Pipeline injected with
+  a provider; MP3 + M4B outputs unchanged.
+- **M10** — Pronunciation subsystem (`pronunciations.yaml`); Director emits hints,
+  adapters apply them.
+- **M11** — Optional validation stage (`--validate`).
+- **M12** — Additive restructure reconciliation, config (`provider`,
+  `scene_analysis`, `output_format: both`), architecture docs.
+
+Tasks are enumerated in `tasks/backlog.md` (M8-01 … M12-06). Each milestone keeps
+the standard gates green and requires Reviewer sign-off before completion.
 
 ### M7 — what landed
 
@@ -88,6 +111,11 @@ Exact for the current fixtures.
 | 5 | Chapter-detection hardening | ✅ Complete | Reviewer-approved 2026-07-12; detection layer done + 77 epub tests pass, all M5 gates green. Product wiring tracked as DEFECT-004 (M6 follow-up) |
 | 6 | Release readiness (docs, CI, packaging) | ✅ Complete | Reviewer-approved 2026-07-12; DEFECT-004 + DEFECT-005 fixed; README/CHANGELOG/LICENSE added; 204 pass / 6 skipped / 1 xfailed, all gates green |
 | 7 | M4B output format | ✅ Complete | Reviewer-approved 2026-07-12; `--format m4b` single-file audiobook; 214 pass / 6 skipped / 1 xfailed, all gates green |
+| 8 | Narration data models + rule-based Director | 📋 Planned | `docs/decisions/003-narration-pipeline.md`; `NarrationPlan` contract, deterministic scene-aware Director |
+| 9 | Provider-adapter abstraction + Kokoro adapter | 📋 Planned | `NarrationProvider` Protocol; Kokoro wraps `KokoroTTSEngine`; MP3/M4B unchanged |
+| 10 | Pronunciation subsystem | 📋 Planned | `pronunciations.yaml` lexicon; Director hints, adapters apply |
+| 11 | Optional validation stage | 📋 Planned | `--validate`; skipped text, timestamps, chapter-duration consistency |
+| 12 | Additive restructure + config + docs | 📋 Planned | `output/`+`metadata/` shims, `output_format: both`, architecture docs |
 
 ---
 

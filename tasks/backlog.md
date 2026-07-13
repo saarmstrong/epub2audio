@@ -108,3 +108,65 @@ then to `tasks/completed/` when done and reviewed.
 - [ ] `M6-07` — Write GitHub Actions CI (ruff + mypy + pytest on macOS + Linux)
 - [ ] `M6-08` — Add example `epub2audio.toml`
 - [ ] `M6-09` — Reviewer: verify all 20 acceptance criteria
+
+---
+
+## Milestone 7 — M4B Output Format
+
+- [x] `M7-*` — `--format m4b` single-file audiobook (complete; Reviewer-approved 2026-07-12)
+
+---
+
+## Milestone 8 — Narration Data Models + Rule-Based Director Skeleton
+
+_Design: `docs/decisions/003-narration-pipeline.md`. Rule-based (deterministic, no LLM), additive._
+
+- [ ] `M8-01` — Architect: add `NarrationDirection`, `NarrationSegment`, `NarrationPlan` to `models.py` (frozen Pydantic, matching Feature.md JSON shape)
+- [ ] `M8-02` — TTS Engineer: create `director/` package with rule-based `build_narration_plan(chapter_text, chapter_index) -> NarrationPlan`
+- [ ] `M8-03` — TTS Engineer: scene grouping + one `default_direction` per scene; local overrides only on significant emotion/intensity change
+- [ ] `M8-04` — TTS Engineer: dialogue detection + likely-speaker labelling (quote/attribution heuristics); reuse `text/segment.py`
+- [ ] `M8-05` — TTS Engineer: fold `text/pauses.py` pause timing + emphasis hints into plan segments; never rewrite prose
+- [ ] `M8-06` — Tester: `tests/director/` unit tests for narration plans (deliverable #7) incl. "text preserved / no invented dialogue" assertions
+- [ ] `M8-07` — Reviewer: verify plans are deterministic and provider-neutral (no SSML / engine tokens)
+
+---
+
+## Milestone 9 — Provider-Adapter Abstraction + Kokoro Adapter
+
+- [ ] `M9-01` — Architect: `providers/base.py` — `NarrationProvider` Protocol (`render()` + `synthesize()`) and `ProviderRequest` model
+- [ ] `M9-02` — TTS Engineer: `providers/kokoro.py` — wrap `KokoroTTSEngine`; punctuation optimization, pause insertion, long-segment splitting, pronunciation-dict application, speed mapping (mapping only, no analysis)
+- [ ] `M9-03` — Architect: interface stubs `providers/{openai,gemini,azure,elevenlabs}.py` (Protocol + `NotImplementedError` + docstrings)
+- [ ] `M9-04` — Audio Engineer: inject `NarrationProvider` into `pipeline/converter.py`; drive Director → render → synthesize; re-key segment resume on plan-segment hash
+- [ ] `M9-05` — Tester: adapter unit tests + boundary test (no analysis logic / cross-layer imports in `providers/`)
+- [ ] `M9-06` — Reviewer: verify MP3 + M4B outputs unchanged; adding a provider needs no pipeline/director edits
+
+---
+
+## Milestone 10 — Pronunciation Subsystem
+
+- [ ] `M10-01` — TTS Engineer: `pronunciation/` — load `pronunciations.yaml` into a provider-neutral lexicon + matcher
+- [ ] `M10-02` — Architect: add YAML dependency; decision record if choice is non-trivial
+- [ ] `M10-03` — TTS Engineer: Director emits pronunciation hints; Kokoro adapter applies them
+- [ ] `M10-04` — `config.py`: add `pronunciation_dictionary` path setting
+- [ ] `M10-05` — Tester: lexicon load + application tests; example `pronunciations.yaml`
+- [ ] `M10-06` — Reviewer: verify hints are provider-neutral and applied only in adapters
+
+---
+
+## Milestone 11 — Optional Validation Stage
+
+- [ ] `M11-01` — Audio Engineer: `validation/` — skipped text, missing chapters, invalid metadata, overlapping timestamps, chapter-duration consistency, pronunciation failures
+- [ ] `M11-02` — Audio Engineer: CLI `--validate` flag → validation report next to `conversion-report.json` (off by default)
+- [ ] `M11-03` — Tester: validation-stage unit tests
+- [ ] `M11-04` — Reviewer: run `convert --validate`, verify report + no false positives on fixtures
+
+---
+
+## Milestone 12 — Additive Restructure Reconciliation + Config + Docs
+
+- [ ] `M12-01` — Add `output/` + `metadata/` thin re-export shims toward Feature.md layout (keep `src/` importable)
+- [ ] `M12-02` — `config.py`: add `provider`, `scene_analysis`, and `output_format: both`
+- [ ] `M12-03` — Wire `output_format: both` (emit MP3 and M4B in one run)
+- [ ] `M12-04` — Write `docs/architecture.md` narration-pipeline section (deliverable #6)
+- [ ] `M12-05` — Update README + CHANGELOG + example `epub2audio.toml`
+- [ ] `M12-06` — Reviewer: verify all Feature.md deliverables (1–7) satisfied
