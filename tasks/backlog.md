@@ -133,16 +133,16 @@ _Design: `docs/decisions/003-narration-pipeline.md`. Rule-based (deterministic, 
 
 ## Milestone 9 — Provider-Adapter Abstraction + Kokoro Adapter
 
-- [ ] `M9-01` — Architect: `providers/base.py` — `NarrationProvider` Protocol (`render()` + `synthesize()`) and `ProviderRequest` model
-- [ ] `M9-02` — TTS Engineer: `providers/kokoro.py` — wrap `KokoroTTSEngine`; punctuation optimization, pause insertion, long-segment splitting, pronunciation-dict application, speed mapping (mapping only, no analysis)
-- [ ] `M9-03` — Architect: interface stubs `providers/{openai,gemini,azure,elevenlabs}.py` (Protocol + `NotImplementedError` + docstrings)
-- [ ] `M9-04` — Audio Engineer: inject `NarrationProvider` into `pipeline/converter.py`; drive Director → render → synthesize; re-key segment resume on plan-segment hash
-- [ ] `M9-05` — Tester: adapter unit tests + boundary test (no analysis logic / cross-layer imports in `providers/`)
-- [ ] `M9-06` — Reviewer: verify MP3 + M4B outputs unchanged; adding a provider needs no pipeline/director edits
+- [x] `M9-01` — Architect: `providers/base.py` — `NarrationProvider` Protocol (`render()` + `synthesize()`) and `ProviderRequest` model
+- [x] `M9-02` — TTS Engineer: `providers/kokoro.py` — wrap `KokoroTTSEngine`; punctuation optimization, pause insertion, long-segment splitting, pronunciation-dict application, speed mapping (mapping only, no analysis)
+- [x] `M9-03` — Architect: interface stubs `providers/{openai,gemini,azure,elevenlabs}.py` (Protocol + `NotImplementedError` + docstrings)
+- [x] `M9-04` — Audio Engineer: inject `NarrationProvider` into `pipeline/converter.py`; drive Director → render → synthesize; re-key segment resume on plan-segment hash
+- [x] `M9-05` — Tester: adapter unit tests + boundary test (no analysis logic / cross-layer imports in `providers/`)
+- [x] `M9-06` — Reviewer: verify MP3 + M4B outputs unchanged; adding a provider needs no pipeline/director edits
 
 _Carry-forward from M8 review (non-blocking):_
-- [ ] `M9-07` — Tidy: `director/plan._pause_after_ms` re-segments an already-segmented `TextSegment`; pass the `TextSegment` to `get_pause` instead of re-running `segment_text`
-- [ ] `M9-08` — Tidy: remove `# type: ignore[arg-type]` in `director/emphasis.py` by typing `_add(level: Literal["light","moderate","strong"])`
+- [x] `M9-07` — Tidy: `director/plan._pause_after_ms` re-segments an already-segmented `TextSegment`; pass the `TextSegment` to `get_pause` instead of re-running `segment_text`
+- [x] `M9-08` — Tidy: remove `# type: ignore[arg-type]` in `director/emphasis.py` by typing `_add(level: Literal["light","moderate","strong"])`
 - [ ] `M9-09` — Tester: add end-to-end **completeness** assertion (all non-divider narration text lands in some segment), not just substring containment
 
 ---
@@ -155,6 +155,7 @@ _Carry-forward from M8 review (non-blocking):_
 - [ ] `M10-04` — `config.py`: add `pronunciation_dictionary` path setting
 - [ ] `M10-05` — Tester: lexicon load + application tests; example `pronunciations.yaml`
 - [ ] `M10-06` — Reviewer: verify hints are provider-neutral and applied only in adapters
+- [ ] `M9-09` (carried) — Tester: end-to-end **completeness** assertion (all non-divider narration text lands in some segment), not just substring containment
 
 ---
 

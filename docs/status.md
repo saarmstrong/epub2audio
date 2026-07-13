@@ -1,6 +1,6 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-13 (M8 rule-based Narration Director — ✅ Reviewer-approved, complete)_
+_Last updated: 2026-07-13 (M9 provider-adapter layer + Director wired into pipeline — ✅ Reviewer-approved, complete)_
 
 ---
 
@@ -33,6 +33,34 @@ Three-layer separation — **Director** (business logic, provider-neutral) →
 
 Tasks are enumerated in `tasks/backlog.md` (M8-01 … M12-06). Each milestone keeps
 the standard gates green and requires Reviewer sign-off before completion.
+
+## Reviewer Sign-off — Milestone 9 (2026-07-13) — Provider-adapter layer
+
+**Result: APPROVED.** Commit `16d3043` on branch `narrative`.
+
+Gates (ffmpeg + Kokoro present): `pytest tests/ -q` → 308 passed / 6 skipped
+(Kokoro-model-gated) / 1 xfailed; `mypy src/epub2audio` → 0 errors (54 files);
+`ruff check` + `ruff format --check` → clean (92 files).
+
+Verified end-to-end with real Kokoro: MP3 path unchanged (`001 - Chapter One.mp3`
+/ `002 - Chapter Two.mp3`, ID3 tags + cover) and M4B path unchanged (single
+`Test Book.m4b`, 2 contiguous chapters, book tags + cover). Content preserved
+via the Director (no dropped/duplicated text). Confirmed: adapters are
+mapping-only (no `providers/` → `director` import; Director imports no
+`providers`/`tts`); `KokoroProvider.render` adjusts only punctuation/whitespace,
+words untouched; resume keying unchanged (bridge `TextSegment` hashes, stable
+WAV filenames, no manifest-model change); only guarded `kokoro` import; no
+`shell=True`; atomic writes; no body text in logs. Four provider stubs
+structurally satisfy the Protocol — add-a-provider = implement one interface.
+
+Non-blocking / carried forward:
+1. `M9-09` (Tester) — add an end-to-end **completeness** assertion (all
+   non-divider narration text lands in some segment) — carried to M10.
+2. `TODO(M10)` pronunciation hook in `KokoroProvider.render` — deferred as planned.
+3. `pause_after_ms` carried in `ProviderRequest` but silence not yet inserted —
+   by design; a future enhancement.
+
+---
 
 ## Reviewer Sign-off — Milestone 8 (2026-07-13) — Narration Director
 
@@ -139,7 +167,7 @@ Exact for the current fixtures.
 | 6 | Release readiness (docs, CI, packaging) | ✅ Complete | Reviewer-approved 2026-07-12; DEFECT-004 + DEFECT-005 fixed; README/CHANGELOG/LICENSE added; 204 pass / 6 skipped / 1 xfailed, all gates green |
 | 7 | M4B output format | ✅ Complete | Reviewer-approved 2026-07-12; `--format m4b` single-file audiobook; 214 pass / 6 skipped / 1 xfailed, all gates green |
 | 8 | Narration data models + rule-based Director | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationPlan` models + `director/` package; scene-aware, deterministic; 252 pass (+38), mypy/ruff green |
-| 9 | Provider-adapter abstraction + Kokoro adapter | 📋 Planned | `NarrationProvider` Protocol; Kokoro wraps `KokoroTTSEngine`; MP3/M4B unchanged |
+| 9 | Provider-adapter abstraction + Kokoro adapter | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationProvider` Protocol + Kokoro adapter; Director wired into pipeline; 308 pass (+56), MP3/M4B verified unchanged |
 | 10 | Pronunciation subsystem | 📋 Planned | `pronunciations.yaml` lexicon; Director hints, adapters apply |
 | 11 | Optional validation stage | 📋 Planned | `--validate`; skipped text, timestamps, chapter-duration consistency |
 | 12 | Additive restructure + config + docs | 📋 Planned | `output/`+`metadata/` shims, `output_format: both`, architecture docs |
