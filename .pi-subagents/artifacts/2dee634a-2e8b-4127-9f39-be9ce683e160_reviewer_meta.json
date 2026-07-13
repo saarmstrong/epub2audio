@@ -1,0 +1,28 @@
+{
+  "runId": "2dee634a-2e8b-4127-9f39-be9ce683e160",
+  "agent": "reviewer",
+  "task": "Run the full Milestone 3 review for epub2audio. This is the milestone sign-off review (M3-06).\n\n## Context\n\nTwo agents completed M3 work in parallel:\n- **TTS Engineer**: implemented tts/voices.py, tts/kokoro.py, and extended cli.py with `voices` and `doctor` commands\n- **Tester**: wrote tests/tts/test_kokoro_smoke.py (6 opt-in smoke tests) and tests/tts/test_voices_command.py (5 passing CLI tests); added auto-skip hook to conftest.py\n\nCurrent state: **117 passed, 11 skipped (6 smoke + 5 e2e FFmpeg), 0 failed**. All M3 tasks in tasks/completed/.\n\n## M3-06 verification — run these commands explicitly\n\n```bash\nuv run epub2audio voices\nuv run epub2audio doctor\nuv run pytest tests/ -v\nuv run ruff check src/ tests/\nuv run ruff format --check src/ tests/\nuv run mypy src/epub2audio\n```\n\nVerify:\n- `voices` produces a Rich table with ≥ 9 rows including `af_heart`, exits 0\n- `doctor` prints a status line for each of: Python, FFmpeg, FFprobe, espeak-ng, kokoro, misaki, disk — exits 0 or 1 (not crashes), never exits 2+\n- `inspect` and `convert --help` still work (no CLI regressions)\n\n## Known issues to investigate\n\n### 1. KokoroTTSEngine language scope (design question, low)\nA `KokoroTTSEngine` instance is initialised with a fixed `lang_code` baked into `KPipeline`. The `synthesize()` method accepts a `language` parameter and validates it via `get_lang_code()`, but the pipeline itself uses the init-time lang_code. This means a single engine cannot switch languages mid-run. Confirm this is intentional per the architecture (it is), note it in the review, and confirm it is documented in the class docstring.\n\n### 2. pyproject.toml mypy overrides accumulation (low)\nThe TTS Engineer added `[[tool.mypy.overrides]]` entries for kokoro and misaki. Verify the final pyproject.toml has no duplicate override stanzas and all overrides are still legitimate.\n\n### 3. Kokoro smoke tests cannot be validated locally (kokoro not installed)\nAssess the structural correctness of the 6 smoke tests by code review. Confirm they carry the correct markers and will skip in default `pytest tests/` runs.\n\n### 4. doctor exit code correctness (medium)\nThe contract specifies: exit 0 if FFmpeg + FFprobe are present; exit 1 if either is missing. On this machine both are absent so exit 1 is expected. Verify the implementation actually exits 1 (not 0 with warnings) when required deps are missing, and exits 0 when they are present (review the code path for when FFmpeg is found).\n\n### 5. Import boundary check\n- No kokoro PyPI imports outside `tts/kokoro.py`\n- No `epub/` imports in `tts/`\n- `tts/kokoro.py` importable without kokoro package installed (run the check)\n\n## Output\n\nFix any defects you find directly. For anything requiring kokoro or FFmpeg, give your best code-path assessment. End with **MILESTONE 3 SIGN-OFF: APPROVED** or **MILESTONE 3 SIGN-OFF: BLOCKED** and update `docs/status.md`.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "anthropic/claude-opus-4-8:high",
+  "attemptedModels": [
+    "anthropic/claude-opus-4-8:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "anthropic/claude-opus-4-8:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 32,
+        "output": 14910,
+        "cacheRead": 427998,
+        "cacheWrite": 41742,
+        "cost": 0.8477965,
+        "turns": 16
+      }
+    }
+  ],
+  "transcriptPath": "/Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/2dee634a-2e8b-4127-9f39-be9ce683e160_reviewer_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1783888776811
+}

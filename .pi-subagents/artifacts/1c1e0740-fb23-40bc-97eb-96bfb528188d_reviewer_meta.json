@@ -1,0 +1,28 @@
+{
+  "runId": "1c1e0740-fb23-40bc-97eb-96bfb528188d",
+  "agent": "reviewer",
+  "task": "Run the full Milestone 2 review for epub2audio. This is the milestone sign-off review.\n\n## Context\n\nThree agents completed M2 work in parallel:\n- **TTS Engineer**: fixed DEFECT-002 (word_count), extended epub/cleanup.py (full HTML→text), wrote text/normalize.py, text/segment.py, text/pauses.py, tts/base.py (TTSEngine Protocol), tts/fake.py (FakeTTSEngine)\n- **Audio Engineer**: wrote utils/subprocess.py, utils/files.py, audio/chunks.py, audio/concatenate.py, audio/encode.py, audio/normalize.py, audio/metadata.py, audio/validate.py, pipeline/planner.py, pipeline/manifest.py, pipeline/resume.py, pipeline/converter.py, extended cli.py with `convert` command (16 flags)\n- **Tester**: wrote tests/test_e2e.py, tests/text/test_normalize.py, tests/text/test_segment.py, tests/audio/test_encode.py, tests/pipeline/test_manifest.py\n\nCurrent state: **112 passed, 5 skipped (FFmpeg absent), 0 failed**. All tasks in tasks/completed/.\n\n## Your checklist\n\nRun the full \"Review Checklist — Every Task\" and \"Milestone Sign-off Checklist\" from your role definition.\n\n## Known issues to investigate — start here\n\n### 1. ChapterResult.duration_seconds is always 0.0 (medium — likely blocker)\n`pipeline/converter.py` never probes the final MP3 for duration. It writes `ChapterResult(duration_seconds=0.0, ...)` as a placeholder. `tests/test_e2e.py::test_convert_epub_chapter_duration_positive` asserts `duration_seconds > 0` — this test will **fail** when FFmpeg is available. Fix: after `validate_mp3`, run an ffprobe call to read the duration and store it on `ChapterResult`. You have `edit` access to fix this.\n\n### 2. test_encode.py mock path (low)\n`tests/audio/test_encode.py` mocks `'epub2audio.audio.encode.run_command'`. Verify that `src/epub2audio/audio/encode.py` imports `run_command` with a direct `from epub2audio.utils.subprocess import run_command` (not `import epub2audio.utils.subprocess`), so the mock path resolves correctly.\n\n### 3. pyproject.toml mypy python_version changed 3.11 → 3.12 (low)\nTTS Engineer bumped this for numpy 2.x stubs. Verify the change is documented and does not silently mask real 3.11 compatibility issues in the code.\n\n### 4. 5 e2e integration tests are skipped (FFmpeg absent)\n`tests/test_e2e.py` tests skip cleanly when `shutil.which(\"ffmpeg\")` is None. FFmpeg is not installed on this machine. You cannot fully validate M2-21 (\"verify all fixture chapters produce valid MP3s\") without FFmpeg. Assess whether to:\n  a) Give conditional approval (tests are structurally correct; FFmpeg validation deferred to CI)\n  b) Block sign-off pending FFmpeg install\n\n### 5. embed_metadata cover art uses .jpg temp extension regardless of image format (very low)\nCosmetic — FFmpeg detects format from bytes, not extension. Confirm this is acceptable.\n\n## Run these commands\n\n```bash\nuv run pytest tests/ -v\nuv run ruff check src/ tests/\nuv run ruff format --check src/ tests/\nuv run mypy src/epub2audio\nuv run epub2audio inspect tests/fixtures/simple_epub3.epub\nuv run epub2audio convert --help\n```\n\n## Security check\n\n- No `shell=True` in any subprocess calls anywhere\n- No `kokoro` imports outside `tts/kokoro.py`\n- No `epub/` imports inside `tts/` or `audio/`\n- No book content in any log statements\n\n## Output\n\nFix issues 1 and 2 directly (you have `edit` access). For anything requiring FFmpeg to validate, give your best assessment of the code path correctness. End with **MILESTONE 2 SIGN-OFF: APPROVED** or **MILESTONE 2 SIGN-OFF: BLOCKED** and update `docs/status.md`.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "anthropic/claude-opus-4-8:high",
+  "attemptedModels": [
+    "anthropic/claude-opus-4-8:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "anthropic/claude-opus-4-8:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 42,
+        "output": 19343,
+        "cacheRead": 769134,
+        "cacheWrite": 57200,
+        "cost": 1.225852,
+        "turns": 21
+      }
+    }
+  ],
+  "transcriptPath": "/Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/1c1e0740-fb23-40bc-97eb-96bfb528188d_reviewer_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1783887916374
+}

@@ -1,0 +1,28 @@
+{
+  "runId": "8bf48b18-2b44-4512-ac70-24c93a47fe7e",
+  "agent": "tester",
+  "task": "You are a delegated subagent running from a fork of the parent session. Treat the inherited conversation as reference-only context, not a live thread to continue. Do not continue or answer prior messages as if they are waiting for a reply. Your sole job is to execute the task below and return a focused result for that task using your tools.\n\nTask:\nRead your task contract at tasks/active/M2-tester.md and execute it fully.\n\nAdditional context:\n- The TTS Engineer and Audio Engineer are running in parallel writing all the implementation modules.\n- Write all test files immediately — import them correctly against the final module paths even if those modules are currently stubs.\n- For test_e2e.py: guard the full test run with `shutil.which(\"ffmpeg\")` — skip if FFmpeg not found. Mark @pytest.mark.integration. The test imports FakeTTSEngine and convert_epub — write these imports now even if the modules are stubs.\n- For unit tests (test_normalize.py, test_segment.py, test_encode.py, test_manifest.py): write the full test logic. For tests that require real implementations (e.g. segment_text), if the module is still a stub when you run pytest, note it in your report but do NOT skip or suppress the test — leave it as a real failing test that documents what must pass.\n- Run `uv run pytest tests/ -v` at the end. The 35 existing M1 tests must still pass. New tests may fail if implementations are stubs — that is acceptable and expected; document which tests are pending implementation.\n- mypy and ruff must pass on all test files regardless of whether implementations are complete.\n\nWhen done, move tasks/active/M2-tester.md to tasks/completed/M2-tester.md.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "anthropic/claude-sonnet-4-6:off",
+  "attemptedModels": [
+    "anthropic/claude-sonnet-4-6:off"
+  ],
+  "modelAttempts": [
+    {
+      "model": "anthropic/claude-sonnet-4-6:off",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 42,
+        "output": 36736,
+        "cacheRead": 3685172,
+        "cacheWrite": 122987,
+        "cost": 2.1179188499999997,
+        "turns": 40
+      }
+    }
+  ],
+  "transcriptPath": "/Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/8bf48b18-2b44-4512-ac70-24c93a47fe7e_tester_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1783884569904
+}

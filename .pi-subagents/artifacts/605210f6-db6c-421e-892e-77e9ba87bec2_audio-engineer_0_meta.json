@@ -1,0 +1,28 @@
+{
+  "runId": "605210f6-db6c-421e-892e-77e9ba87bec2",
+  "agent": "audio-engineer",
+  "task": "Read and complete tasks/active/M4-audio-engineer.md. This is the Milestone 4 reliability task. Fix DEFECT-003 by:\n\n1. Creating a persistent work directory at <output>/.epub2audio-work/<chapter_id>/ for segment WAVs\n2. Populating manifest.segments with TextSegment entries after each synthesis (with audio_path set)\n3. Wiring up segment_needs_synthesis() to skip already-cached segments on resume\n4. Implementing config change invalidation (voice/language/speed changes clear segment cache)\n5. Adding proper cleanup rules (delete work dir only on full success unless --keep-intermediates)\n\nKey files:\n- src/epub2audio/pipeline/converter.py (main changes)\n- src/epub2audio/pipeline/resume.py (invalidation helpers)\n- tasks/active/DEFECT-003-segment-resume-not-persisted.md (root cause analysis)\n\nRun tests after changes: uv run pytest tests/ -v\nVerify types: uv run mypy src/epub2audio\n\n---\nCreate and maintain progress at: /Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/progress/605210f6-db6c-421e-892e-77e9ba87bec2/progress.md\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/outputs/605210f6-db6c-421e-892e-77e9ba87bec2/m4-audio-engineer-result.md\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "anthropic/claude-sonnet-4-6:medium",
+  "attemptedModels": [
+    "anthropic/claude-sonnet-4-6:medium"
+  ],
+  "modelAttempts": [
+    {
+      "model": "anthropic/claude-sonnet-4-6:medium",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 23,
+        "output": 16086,
+        "cacheRead": 548886,
+        "cacheWrite": 41734,
+        "cost": 0.5625273000000001,
+        "turns": 21
+      }
+    }
+  ],
+  "transcriptPath": "/Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/605210f6-db6c-421e-892e-77e9ba87bec2_audio-engineer_0_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1783890645767
+}

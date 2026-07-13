@@ -62,16 +62,34 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "C4", "PT", "RUF"]
-ignore = ["E501"]
+ignore = ["E501", "B008", "RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["epub2audio"]
 
 [tool.mypy]
-python_version = "3.11"
+# Runtime is Python 3.12 (the minimum supported version that ships numpy 2.x
+# stubs, which use the `type` statement syntax requiring 3.12+).  The project
+# supports >=3.11 at install time; CI should add a 3.11 run with numpy<2.
+python_version = "3.12"
 strict = true
 files = ["src/epub2audio"]
 mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["ebooklib", "ebooklib.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# numpy 2.x stubs are bundled inline and are compatible with 3.12+.
+# soundfile has no py.typed marker and ships no stubs.
+module = ["soundfile", "soundfile.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# kokoro and misaki are optional [tts] extras with no type stubs.
+module = ["kokoro", "kokoro.*", "misaki", "misaki.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

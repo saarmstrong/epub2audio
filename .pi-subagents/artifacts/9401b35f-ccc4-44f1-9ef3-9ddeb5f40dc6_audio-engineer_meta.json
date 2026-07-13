@@ -1,0 +1,28 @@
+{
+  "runId": "9401b35f-ccc4-44f1-9ef3-9ddeb5f40dc6",
+  "agent": "audio-engineer",
+  "task": "You are a delegated subagent running from a fork of the parent session. Treat the inherited conversation as reference-only context, not a live thread to continue. Do not continue or answer prior messages as if they are waiting for a reply. Your sole job is to execute the task below and return a focused result for that task using your tools.\n\nTask:\nRead your task contract at tasks/active/M2-audio-engineer.md and execute it fully.\n\nAdditional context:\n- All source stubs are already in place under src/epub2audio/audio/, src/epub2audio/pipeline/, and src/epub2audio/utils/.\n- The TTS Engineer is running in parallel and will produce tts/base.py (TTSEngine Protocol) and tts/fake.py (FakeTTSEngine). Before implementing converter.py (M2-18), check that tts/base.py contains the full TTSEngine Protocol — if it is still a stub, reference the canonical definition from docs/architecture.md and write converter.py against that interface (the Protocol signature will not change).\n- Start with utils/subprocess.py and utils/files.py — these have no dependencies and unblock everything else.\n- All FFmpeg calls must use argument arrays via utils/subprocess.py. Never shell=True or string interpolation.\n- pyproject.toml already has soundfile and numpy as dependencies.\n- FFmpeg and FFprobe are assumed to be available on the system (standard macOS install).\n- For converter.py: import TTSEngine from tts.base, not from kokoro or fake — the engine is injected at call time.\n- For cli.py convert command: use `try: from epub2audio.tts.kokoro import KokoroTTSEngine; engine = KokoroTTSEngine() except Exception: from epub2audio.tts.fake import FakeTTSEngine; engine = FakeTTSEngine()` for engine selection.\n- The existing inspect command must not regress.\n\nWhen done, move tasks/active/M2-audio-engineer.md to tasks/completed/M2-audio-engineer.md.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "anthropic/claude-sonnet-4-6:off",
+  "attemptedModels": [
+    "anthropic/claude-sonnet-4-6:off"
+  ],
+  "modelAttempts": [
+    {
+      "model": "anthropic/claude-sonnet-4-6:off",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 70,
+        "output": 29827,
+        "cacheRead": 6712763,
+        "cacheWrite": 120228,
+        "cost": 2.9122988999999992,
+        "turns": 68
+      }
+    }
+  ],
+  "transcriptPath": "/Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/9401b35f-ccc4-44f1-9ef3-9ddeb5f40dc6_audio-engineer_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1783884563348
+}

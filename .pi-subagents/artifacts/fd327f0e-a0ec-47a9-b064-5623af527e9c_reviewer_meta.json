@@ -1,0 +1,29 @@
+{
+  "runId": "fd327f0e-a0ec-47a9-b064-5623af527e9c",
+  "agent": "reviewer",
+  "task": "Read tasks/active/M5-reviewer.md and perform Milestone 5 sign-off.\n\n## Previous Step Results\n\n### EPUB Engineer Result (Step 1):\n- D1: Multi-file chapter merging via `merge_consecutive_chapters()`\n- D2: Single-file chapter splitting via `split_multi_chapter_docs()`  \n- D3: Scoring refinements (titlepage -5, halftitlepage -5, multiple_h1 -1, new exclusion types)\n- D4: Fragment extraction in `xhtml_to_text(start_fragment, end_fragment)`\n- `finalize_chapters()` orchestrates merge → split → renumber\n- Changed files: cleanup.py, chapters.py, builders.py, test_chapters.py\n\n### Tester Result (Step 2):\n- Created 6 new builder functions in builders.py\n- Created test_chapter_merge.py (8 tests)\n- Created test_chapter_split.py (9 tests)\n- Created test_cleanup_fragments.py (9 tests)\n- Added 2 tests to test_chapters.py\n- 77 epub tests pass, ruff clean\n- Note: 16 M4 FFmpeg pipeline tests fail (out of scope, loudnorm exit 234)\n\n## Verification Tasks\n\n1. Run all gates:\n   - uv run pytest tests/epub/ -v (M5 scope - should be 77 pass)\n   - uv run mypy src/epub2audio\n   - uv run ruff check src/ tests/\n   - uv run ruff format --check src/ tests/\n\n2. Code review chapters.py changes:\n   - merge_consecutive_chapters() logic\n   - split_multi_chapter_docs() logic\n   - finalize_chapters() orchestration\n   - New scoring weights\n\n3. Manual testing:\n   - uv run epub2audio inspect tests/fixtures/simple_epub3.epub (no regression)\n\n4. Verify acceptance criteria:\n   - 'Multi-file chapters can be merged' ✅\n   - 'Multi-chapter single-file can be split' ✅\n\n5. Update docs/status.md with M5 sign-off\n\n6. Move completed tasks to tasks/completed/\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/outputs/fd327f0e-a0ec-47a9-b064-5623af527e9c/m5-reviewer-result.md\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 234,
+  "model": "anthropic/claude-opus-4-8:high",
+  "attemptedModels": [
+    "anthropic/claude-opus-4-8:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "anthropic/claude-opus-4-8:high",
+      "success": false,
+      "exitCode": 234,
+      "error": "bash failed (exit 234):     assert result.duration_seconds > 0, (\nE   AssertionError: Chapter ch001 has zero/negative duration\nE   assert 0.0 > 0\nE    +  where 0.0 = ChapterResult(chapter_id='ch001', duration_seconds=0.0, wa",
+      "usage": {
+        "input": 22,
+        "output": 7606,
+        "cacheRead": 309948,
+        "cacheWrite": 45801,
+        "cost": 0.63149025,
+        "turns": 11
+      }
+    }
+  ],
+  "transcriptPath": "/Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/fd327f0e-a0ec-47a9-b064-5623af527e9c_reviewer_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1783893148219
+}

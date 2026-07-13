@@ -1,0 +1,28 @@
+{
+  "runId": "52bb0e75-3362-4124-9c7f-a6a962497831",
+  "agent": "tts-engineer",
+  "task": "You are a delegated subagent running from a fork of the parent session. Treat the inherited conversation as reference-only context, not a live thread to continue. Do not continue or answer prior messages as if they are waiting for a reply. Your sole job is to execute the task below and return a focused result for that task using your tools.\n\nTask:\nRead your task contract at tasks/active/M3-tts-engineer.md and execute it fully.\n\nAdditional context:\n- kokoro is an optional dependency (`uv pip install epub2audio[tts]`). It is almost certainly NOT installed in the current venv. Design kokoro.py so that `from epub2audio.tts.kokoro import KokoroTTSEngine` succeeds regardless — wrap ALL kokoro imports in try/except inside __init__ and raise MissingDependencyError there, not at import time.\n- The KPipeline generator yields `(grapheme, phoneme, audio_array)` tuples — destructure as `(_, _, piece)` and read sample_rate from the AudioChunk after the first piece (or use a known default with a comment); the API may not expose sample_rate directly from the generator tuple. Check the kokoro package API if installed; otherwise implement defensively per the tts-engineer agent role spec.\n- `tts/voices.py` language map and `get_lang_code()` are imported by `kokoro.py` — write voices.py first.\n- The `voices` and `doctor` CLI commands extend the existing Typer app in cli.py — do not create a new app object.\n- tests/tts/ directory already exists (empty). The Tester is writing the test files; you do not need to write tests.\n- Run `uv run pytest tests/ -v` at the end to confirm no regressions in the existing 112 tests.\n\nWhen done, move tasks/active/M3-tts-engineer.md to tasks/completed/M3-tts-engineer.md.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "anthropic/claude-sonnet-4-6:off",
+  "attemptedModels": [
+    "anthropic/claude-sonnet-4-6:off"
+  ],
+  "modelAttempts": [
+    {
+      "model": "anthropic/claude-sonnet-4-6:off",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 31,
+        "output": 10230,
+        "cacheRead": 2462029,
+        "cacheWrite": 97627,
+        "cost": 1.25825295,
+        "turns": 29
+      }
+    }
+  ],
+  "transcriptPath": "/Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/52bb0e75-3362-4124-9c7f-a6a962497831_tts-engineer_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1783888519252
+}

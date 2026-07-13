@@ -1,0 +1,1 @@
+Task contract moved. All work complete.

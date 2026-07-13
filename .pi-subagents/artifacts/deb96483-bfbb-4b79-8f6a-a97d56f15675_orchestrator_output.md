@@ -1,0 +1,1 @@
+Everything is in order. Here is the structured acceptance report:

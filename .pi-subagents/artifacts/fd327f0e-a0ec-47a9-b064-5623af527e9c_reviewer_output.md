@@ -1,0 +1,1 @@
+All gates green. Let me verify the full suite to confirm M5 introduced no new failures (Tester flagged pre-existing FFmpeg failures).

@@ -1,0 +1,28 @@
+{
+  "runId": "9f0eba49-b711-4e6a-8cea-2d883d1860e3",
+  "agent": "reviewer",
+  "task": "Run the full Milestone 1 review for epub2audio. This is the milestone sign-off review.\n\n## Context\n\nThree agents just completed their M1 work in parallel:\n- **Architect**: wrote `src/epub2audio/models.py` and `src/epub2audio/errors.py`\n- **EPUB Engineer**: wrote `src/epub2audio/config.py`, all `epub/` modules, `utils/names.py`, `cli.py`\n- **Tester**: wrote `tests/fixtures/builders.py`, generated both `.epub` fixtures, wrote `tests/epub/test_*.py`\n\nAll task contracts are in `tasks/completed/`. `tasks/active/` is empty. 35 tests currently pass.\n\n## Your checklist (from your agent role)\n\nRun every item from the \"Review Checklist — Every Task\" and \"Milestone Sign-off Checklist\" in your role definition.\n\n## Known issues to investigate — start here\n\nThese were flagged by the agents themselves:\n\n### 1. `errors.py` parallel write (medium)\nBoth the Architect and EPUB Engineer independently wrote `src/epub2audio/errors.py`. Verify the on-disk version is coherent, matches the M1-architect.md contract, has all 8 required exceptions, has correct `__init__` signatures with custom attributes, and no cross-imports from other epub2audio modules.\n\n### 2. `XMLParsedAsHTMLWarning` — 52 warnings per test run (medium)\n`epub/cleanup.py` and `epub/chapters.py` call `BeautifulSoup(content, \"lxml\")` on XHTML bytes. This invokes the HTML parser, which generates `XMLParsedAsHTMLWarning`. The correct call is `BeautifulSoup(content, features=\"xml\")` (the lxml XML parser). Fix this in both files and re-run tests to confirm no regressions.\n\n### 3. `word_count = 0` for chapters with ≥ 200 words (low — M2 deferred)\n`Chapter.word_count` is only populated when the `short_document` scoring signal fires. Long chapters report `0`. Confirm this is visible in `inspect` output and note it in your report. No fix required for M1 — just verify it does not silently corrupt data.\n\n### 4. `pyproject.toml` additions (low)\nEPUB Engineer added:\n- `[[tool.mypy.overrides]]` with `ignore_missing_imports = true` for `ebooklib`\n- Ruff ignore rules: `B008` (Typer defaults), `RUF001`, `RUF002`, `RUF003` (en-dash in strings/docstrings)\nVerify these are acceptable project-wide suppressions and do not hide real issues.\n\n### 5. `builders.py` concurrent writes (low)\nBoth EPUB Engineer and Tester touched `tests/fixtures/builders.py`. Verify the final file has the full builder API (8 functions from M1-tester.md contract) and the two bugs the EPUB Engineer fixed are present.\n\n## Milestone sign-off command\n\n```bash\nuv run epub2audio inspect tests/fixtures/simple_epub3.epub\n```\n\nMust produce a Rich table with at least 2 chapters in correct reading order.\n\nAlso run:\n```bash\nuv run pytest tests/ -v\nuv run ruff check src/ tests/\nuv run ruff format --check src/ tests/\nuv run mypy src/epub2audio\n```\n\n## Output\n\n- Fix issues 1 and 2 directly if they are defects (you have `edit` access).\n- For anything you cannot fix or that is out of scope, create `tasks/active/DEFECT-NNN-short-title.md` per your role definition.\n- End with a clear **MILESTONE 1 SIGN-OFF: APPROVED** or **MILESTONE 1 SIGN-OFF: BLOCKED** with your reasoning.\n- Update `docs/status.md` to reflect the outcome.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "anthropic/claude-opus-4-8:high",
+  "attemptedModels": [
+    "anthropic/claude-opus-4-8:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "anthropic/claude-opus-4-8:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 32,
+        "output": 16854,
+        "cacheRead": 698263,
+        "cacheWrite": 70256,
+        "cost": 1.2097414999999998,
+        "turns": 16
+      }
+    }
+  ],
+  "transcriptPath": "/Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/9f0eba49-b711-4e6a-8cea-2d883d1860e3_reviewer_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1783883386261
+}

@@ -1,209 +1,217 @@
 # epub2audio
 
-Convert EPUB ebooks into audiobooks using local, offline text-to-speech.
+Convert EPUB ebooks to MP3 audiobooks using Kokoro TTS.
 
-> **Legal notice:** This tool is intended for ebooks you have the legal right to process.
-> It does not remove DRM. DRM-protected EPUBs are rejected with a clear error message.
-> No book content is transmitted to any external service.
+## Features
 
----
-
-## Status
-
-🚧 **Under active development.** See [`docs/status.md`](docs/status.md) for current milestone.
-
----
-
-## What it does
-
-`epub2audio` reads an EPUB file, detects logical chapters in reading order, converts each
-chapter to speech using [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI), and
-writes one MP3 file per chapter with embedded metadata and cover art.
-
-```
-audiobooks/
-└── My Book/
-    ├── cover.jpg
-    ├── metadata.json
-    ├── 001 - Prologue.mp3
-    ├── 002 - Chapter One.mp3
-    └── conversion-report.json
-```
-
----
-
-## Platform support
-
-| Platform | Status |
-|---|---|
-| Apple Silicon macOS | Primary target |
-| Intel macOS | Supported |
-| Linux | Supported |
-| Windows | Not yet verified |
-
----
-
-## Requirements
-
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/)
-- FFmpeg + FFprobe
-- espeak-ng (required by Kokoro on some platforms)
-
-### Install system dependencies
-
-**macOS**
-```bash
-brew install ffmpeg espeak-ng
-```
-
-**Debian / Ubuntu**
-```bash
-sudo apt-get install ffmpeg espeak-ng
-```
-
----
+- **One MP3 per logical chapter** — automatic chapter detection from EPUB structure
+- **Multi-file chapter merging** — combines split chapters into single tracks
+- **Single-file chapter splitting** — separates combined chapters by TOC fragments
+- **Resume interrupted conversions** — pick up where you left off
+- **Configurable voice, speed, language** — 9 Kokoro voices available
+- **Cover art and metadata embedding** — ID3 tags with book info
+- **Loudness normalization** — EBU R128 standard (-18 LUFS)
+- **Local processing only** — no data sent to external services
 
 ## Installation
 
+### Prerequisites
+
+- Python 3.11+
+- FFmpeg (with libmp3lame encoder)
+- espeak-ng (for Kokoro phonemization)
+
 ```bash
-git clone https://github.com/yourname/epub2audio
+# macOS
+brew install ffmpeg espeak-ng
+
+# Ubuntu/Debian
+sudo apt install ffmpeg espeak-ng
+
+# Windows (via Chocolatey)
+choco install ffmpeg espeak-ng
+```
+
+### Install epub2audio
+
+```bash
+# Clone and install with uv
+git clone https://github.com/user/epub2audio.git
 cd epub2audio
 uv sync
+
+# Or install with pip
+pip install epub2audio
 ```
 
----
-
-## Quick start
+### Install Kokoro TTS
 
 ```bash
-# Check your environment
-uv run epub2audio doctor
+pip install kokoro misaki
 
-# Preview chapter detection without generating audio
-uv run epub2audio inspect book.epub
-
-# Convert
-uv run epub2audio convert book.epub --output ./audiobooks
+# The model downloads automatically on first use (~400MB)
 ```
 
----
-
-## Commands
-
-### `inspect`
-Parse an EPUB and display the proposed conversion plan — chapters, word counts,
-inclusion/exclusion decisions — without generating any audio.
+## Quick Start
 
 ```bash
+# Convert an EPUB to MP3 audiobook
+epub2audio convert book.epub --output ./audiobooks
+
+# Preview conversion plan without generating audio
 epub2audio inspect book.epub
-epub2audio inspect book.epub --json
-```
 
-### `convert`
-Convert an EPUB to MP3 audiobook chapters.
-
-```bash
-epub2audio convert book.epub \
-  --output ./audiobooks \
-  --voice af_heart \
-  --language en-us \
-  --speed 1.0 \
-  --bitrate 96k \
-  --normalize \
-  --resume
-```
-
-Key flags:
-- `--dry-run` — plan and validate without generating audio
-- `--resume` / `--no-resume` — continue an interrupted conversion
-- `--include-front-matter` — include cover, title page, copyright, etc.
-- `--include-back-matter` — include index, bibliography, etc.
-- `--chapter N` — convert only chapter N (number or regex)
-- `--verbose` — show full diagnostic output
-
-### `voices`
-List available Kokoro voices grouped by language.
-
-```bash
+# List available voices
 epub2audio voices
-epub2audio voices --sample af_heart
-```
 
-### `doctor`
-Check that all required tools and models are installed and working.
-
-```bash
+# Check environment and dependencies
 epub2audio doctor
 ```
 
-### `config`
-Manage the TOML configuration file.
+## CLI Reference
+
+### `convert` — Convert EPUB to MP3
 
 ```bash
-epub2audio config show
-epub2audio config path
-epub2audio config init
+epub2audio convert BOOK.epub [OPTIONS]
+
+Options:
+  --output, -o PATH        Output directory [default: current dir]
+  --voice TEXT             Kokoro voice [default: af_heart]
+  --language TEXT          Language code [default: from EPUB or en-us]
+  --speed FLOAT            Speech speed [default: 1.0]
+  --bitrate TEXT           MP3 bitrate [default: 96k]
+  --sample-rate INT        Audio sample rate [default: 24000]
+  --normalize / --no-normalize  Loudness normalization [default: enabled]
+  --resume / --no-resume   Resume interrupted conversion [default: enabled]
+  --overwrite              Overwrite existing files
+  --include-front-matter   Include preface, foreword, etc.
+  --include-back-matter    Include appendix, notes, etc.
+  --chapter TEXT           Convert specific chapter (regex or number)
+  --chapter-start INT      Start from chapter N
+  --chapter-end INT        End at chapter N
+  --dry-run                Show plan without converting
+  --keep-intermediates     Preserve intermediate WAV files
+  --workers INT            Parallel workers [default: 1]
+  --config PATH            Config file path
+  --verbose, -v            Verbose output
+  --quiet, -q              Minimal output
 ```
 
----
+### `inspect` — Preview Conversion Plan
+
+```bash
+epub2audio inspect BOOK.epub
+
+# Shows:
+# - Book metadata (title, author)
+# - Chapter list with word counts
+# - Excluded documents (front/back matter)
+# - Scoring signals for each document
+```
+
+### `voices` — List Available Voices
+
+```bash
+epub2audio voices
+
+# Shows table of 9 Kokoro voices with descriptions
+```
+
+### `doctor` — Check Environment
+
+```bash
+epub2audio doctor
+
+# Checks: Python, FFmpeg, FFprobe, espeak-ng, Kokoro, disk space
+# Exit 0 = all OK, Exit 1 = missing dependencies
+```
 
 ## Configuration
 
-`epub2audio` reads `epub2audio.toml` from the current directory, then
-`~/.config/epub2audio/config.toml`. CLI flags always take precedence.
+Create `~/.config/epub2audio/config.toml`:
 
 ```toml
-[tts]
+# Default voice (see 'epub2audio voices' for options)
 voice = "af_heart"
+
+# Language code (BCP-47)
 language = "en-us"
+
+# Speech speed multiplier
 speed = 1.0
 
-[audio]
-format = "mp3"
+# MP3 encoding
 bitrate = "96k"
 sample_rate = 24000
+
+# Processing options
 normalize = true
-loudness_lufs = -18.0
-true_peak_db = -2.0
-
-[conversion]
 resume = true
-include_front_matter = false
-include_back_matter = false
-keep_intermediates = false
-workers = 1
-
-[text]
-announce_chapter_titles = true
-pause_after_heading_ms = 700
-pause_between_sections_ms = 450
-pause_between_paragraphs_ms = 180
 ```
 
----
+Or per-project `epub2audio.toml` in the current directory.
 
-## Resume behaviour
+## Output Structure
 
-If a conversion is interrupted, re-run the same command. epub2audio will verify the
-EPUB fingerprint and configuration, then skip already-completed segments and chapters.
-Change voice, speed, language, or audio settings to invalidate cached audio automatically.
+```
+audiobooks/
+└── Book Title/
+    ├── cover.jpg
+    ├── metadata.json
+    ├── 001 - Chapter One.mp3
+    ├── 002 - Chapter Two.mp3
+    ├── ...
+    └── conversion-report.json
+```
 
----
+## Troubleshooting
 
-## Privacy
+### "FFmpeg not found"
 
-- All processing is local. No content, metadata, or audio leaves your machine.
-- No telemetry is collected or transmitted.
-- Book text is never written to log files.
+Install FFmpeg with MP3 support:
+```bash
+# Verify installation
+ffmpeg -version
+ffprobe -version
+```
 
----
+### "espeak-ng not found"
 
-## Current limitations
+Kokoro requires espeak-ng for phonemization:
+```bash
+# Verify installation
+espeak-ng --version
+```
 
-See [`docs/status.md`](docs/status.md) for what is and is not yet implemented.
+### "Kokoro model not found"
 
-- No DRM removal (by design)
-- No M4B output (planned)
-- No graphical interface (planned)
-- Windows support not yet verified
+The model downloads on first use. Ensure you have ~400MB free space and internet access.
+
+### Chapters not detected correctly
+
+Use `epub2audio inspect book.epub` to see scoring signals. Front/back matter is excluded by default; use `--include-front-matter` or `--include-back-matter` to include them.
+
+## Development
+
+```bash
+# Run tests
+uv run pytest tests/ -v
+
+# Type checking
+uv run mypy src/epub2audio
+
+# Linting
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
+```
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
+
+## Acknowledgments
+
+- [Kokoro](https://github.com/hexgrad/kokoro) — High-quality TTS engine
+- [ebooklib](https://github.com/aerkalov/ebooklib) — EPUB parsing
+- [FFmpeg](https://ffmpeg.org/) — Audio encoding

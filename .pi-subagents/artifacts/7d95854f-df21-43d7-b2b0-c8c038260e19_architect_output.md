@@ -1,0 +1,1 @@
+All checks pass. Here is the structured acceptance report:

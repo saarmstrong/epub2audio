@@ -1,0 +1,1 @@
+All gates green. Here is the structured acceptance report:

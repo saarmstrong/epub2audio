@@ -1,40 +1,36 @@
 {
-  "defaultProvider": "anthropic",
-  "defaultModel": "claude-sonnet-4-6",
-  "defaultThinkingLevel": "medium",
+  "defaultProvider": "openai",
+  "defaultModel": "gpt-4o",
 
   "prompts": [
     "prompts/*.md"
   ],
 
   "subagents": {
-    "defaultModel": "anthropic/claude-sonnet-4-6",
+    "defaultModel": "openai/gpt-4o",
+    "disableThinking": true,
 
     "agentOverrides": {
       "orchestrator": {
-        "model": "anthropic/claude-sonnet-4-6",
-        "thinking": "high"
+        "model": "openai/o4-mini"
       },
       "architect": {
-        "model": "anthropic/claude-sonnet-4-6",
-        "thinking": "high"
-      },
-      "epub-engineer": {
-        "thinking": "medium"
-      },
-      "tts-engineer": {
-        "thinking": "medium"
-      },
-      "audio-engineer": {
-        "thinking": "medium"
+        "model": "openai/o4-mini"
       },
       "tester": {
-        "model": "anthropic/claude-sonnet-4-6",
-        "thinking": "high"
+        "model": "openai/o4-mini"
+      },
+      "epub-engineer": {
+        "model": "openai/gpt-4o"
+      },
+      "tts-engineer": {
+        "model": "openai/gpt-4o"
+      },
+      "audio-engineer": {
+        "model": "openai/gpt-4o"
       },
       "reviewer": {
-        "model": "anthropic/claude-opus-4-8",
-        "thinking": "high"
+        "model": "openai/o3"
       }
     }
   }

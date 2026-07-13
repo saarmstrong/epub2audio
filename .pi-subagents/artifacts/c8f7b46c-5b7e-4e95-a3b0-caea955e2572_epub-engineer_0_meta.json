@@ -1,0 +1,28 @@
+{
+  "runId": "c8f7b46c-5b7e-4e95-a3b0-caea955e2572",
+  "agent": "epub-engineer",
+  "task": "Read and complete tasks/active/M5-epub-engineer.md. This is Milestone 5: Chapter-Detection Hardening.\n\nKey deliverables:\n\n**D1: Multi-File Chapter Merging**\n- Consecutive spine items where only the first has a TOC entry should merge\n- Add `merge_consecutive_chapters()` function\n- Combined `source_docs` and summed word counts\n\n**D2: Single-File Chapter Splitting**\n- Documents with fragment-based TOC entries should split\n- Multiple h1 elements in one doc should split\n- Support `doc.xhtml#fragment` in source_docs\n\n**D3: Scoring Refinements**\n- Add `titlepage`, `halftitlepage`, `seriespage`, `loi`, `lot`, `errata` to exclusion epub:types\n- Adjust weights as needed\n\n**D4: Fragment Extraction** (if needed)\n- Update `xhtml_to_text()` to support `start_fragment` and `end_fragment` params\n\nKey files:\n- src/epub2audio/epub/chapters.py (main changes)\n- src/epub2audio/epub/cleanup.py (fragment extraction)\n- src/epub2audio/models.py (possibly extend source_docs or add ChapterSection)\n- tests/fixtures/builders.py (new fixture builders)\n\nRun tests: uv run pytest tests/ -v\nType check: uv run mypy src/epub2audio\n\n---\nCreate and maintain progress at: /Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/progress/c8f7b46c-5b7e-4e95-a3b0-caea955e2572/progress.md\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/outputs/c8f7b46c-5b7e-4e95-a3b0-caea955e2572/m5-epub-engineer-result.md\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "anthropic/claude-sonnet-4-6:medium",
+  "attemptedModels": [
+    "anthropic/claude-sonnet-4-6:medium"
+  ],
+  "modelAttempts": [
+    {
+      "model": "anthropic/claude-sonnet-4-6:medium",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 39,
+        "output": 39162,
+        "cacheRead": 1925853,
+        "cacheWrite": 75270,
+        "cost": 1.4475653999999996,
+        "turns": 37
+      }
+    }
+  ],
+  "transcriptPath": "/Users/andyarmstrong/Projects/epub2mp3/.pi-subagents/artifacts/c8f7b46c-5b7e-4e95-a3b0-caea955e2572_epub-engineer_0_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1783892196548
+}
