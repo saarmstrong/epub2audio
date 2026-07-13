@@ -194,6 +194,11 @@ def convert(
         None, "--chapter-end", help="Last chapter number to convert (1-based, inclusive)."
     ),
     config: Path | None = typer.Option(None, "--config", help="Path to TOML configuration file."),
+    validate: bool = typer.Option(
+        False,
+        "--validate",
+        help="Run post-conversion quality checks and write validation-report.json.",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose logging."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output."),
 ) -> None:
@@ -367,6 +372,44 @@ def convert(
         if report.errors:
             for err in report.errors:
                 _err_console.print(f"[red]Error:[/red] {err}")
+
+    # ------------------------------------------------------------------ #
+    # Optional validation stage (--validate)                               #
+    # ------------------------------------------------------------------ #
+    if validate:
+        from epub2audio.utils.files import atomic_write
+        from epub2audio.validation import validate_conversion
+
+        validation = validate_conversion(report, filtered_plan, settings, output)
+
+        # Write validation-report.json atomically alongside conversion-report.json.
+        validation_report_path = output / "validation-report.json"
+        atomic_write(
+            validation_report_path,
+            validation.model_dump_json(indent=2).encode("utf-8"),
+        )
+
+        if not quiet:
+            status_colour = "green" if validation.ok else "red"
+            status_label = "PASSED" if validation.ok else "FAILED"
+            _console.print(
+                f"\n[{status_colour}]Validation {status_label}[/{status_colour}] "
+                f"— {validation.error_count} error(s), "
+                f"{validation.warning_count} warning(s), "
+                f"{validation.info_count} info."
+            )
+            if validation.issues:
+                for issue in validation.issues:
+                    if issue.severity == "error":
+                        _err_console.print(f"  [red]\u2717 [{issue.code}][/red] {issue.message}")
+                    elif issue.severity == "warning":
+                        _console.print(f"  [yellow]\u26a0 [{issue.code}][/yellow] {issue.message}")
+                    else:
+                        _console.print(f"  [dim][{issue.code}][/dim] {issue.message}")
+            _console.print(f"[dim]Validation report written to {validation_report_path}[/dim]")
+        # Exit-code policy: validation failures print clearly but do not change
+        # the process exit code in M11.  A future milestone may add --fail-on-validation
+        # to gate CI on validation outcome without changing the default behaviour.
 
 
 @app.command()

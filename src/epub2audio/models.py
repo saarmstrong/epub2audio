@@ -492,3 +492,127 @@ class ConversionReport(BaseModel):
 
     chapter_markers: list[ChapterMarker] = []
     """Chapter offsets inside the single M4B file (empty for MP3 output)."""
+
+
+# ---------------------------------------------------------------------------
+# Validation models
+# ---------------------------------------------------------------------------
+#
+# These models represent the output of the optional post-conversion validation
+# stage introduced in Milestone 11 (see docs/decisions/003-narration-pipeline.md
+# §7 and Feature.md "Quality Assurance").  The validation logic, checks, and
+# CLI wiring live in ``validation/`` (Audio Engineer M11-01/M11-02); only the
+# data types are defined here.
+#
+# ``ValidationReport`` is serialized to ``validation-report.json`` alongside
+# ``conversion-report.json`` in the output directory.  Callers check ``ok``
+# (True iff no ``error``-severity issues) before inspecting individual issues.
+
+ValidationSeverity = Literal["error", "warning", "info"]
+"""Severity level of a single :class:`ValidationIssue`.
+
+``"error"``
+    A condition that indicates the output is likely incorrect or unusable.
+    At least one ``error`` issue causes :attr:`ValidationReport.ok` to be
+    ``False``.
+
+``"warning"``
+    A suspicious condition that deserves attention but does not by itself
+    indicate a broken output.  Warnings do not affect ``ok``.
+
+``"info"``
+    An informational observation recorded for diagnostics.  Does not affect
+    ``ok``.
+"""
+
+
+class ValidationIssue(BaseModel):
+    """A single finding produced by the validation stage.
+
+    ``code`` is a stable, machine-readable identifier that tests and external
+    tools may match on — it must never be renamed without a decision record and
+    a migration note.  Known codes (non-exhaustive):
+
+    * ``"missing_chapter"`` — a chapter expected from the conversion plan has
+      no corresponding output file.
+    * ``"skipped_text"`` — text present in the EPUB was not synthesised.
+    * ``"invalid_metadata"`` — a required metadata field is absent or malformed
+      in the output container.
+    * ``"overlapping_timestamps"`` — two chapter markers overlap in the M4B
+      timeline.
+    * ``"chapter_duration"`` — a chapter's audio duration deviates from the
+      expected range.
+    * ``"missing_output_file"`` — an output file path recorded in the
+      conversion report does not exist on disk.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    code: str
+    """Stable machine-readable identifier for the issue type.
+
+    Codes are **never renamed** once in use; tests and downstream tools may
+    match on them.  New codes are introduced additively; deprecated codes are
+    documented in the relevant decision record before removal.
+    """
+
+    severity: ValidationSeverity
+    """Severity level: ``"error"``, ``"warning"``, or ``"info"``."""
+
+    message: str
+    """Human-readable description of the issue, suitable for display in a
+    terminal or log file."""
+
+    chapter_id: str | None = None
+    """The ``chapter_id`` of the affected chapter, or ``None`` for issues that
+    apply to the book as a whole (e.g. missing metadata, total-duration
+    anomalies)."""
+
+
+class ValidationReport(BaseModel):
+    """Aggregated result of the post-conversion validation stage.
+
+    Serialized to ``validation-report.json`` in the output directory alongside
+    ``conversion-report.json``.  Callers (CLI, CI, downstream tools) should
+    check :attr:`ok` first and only inspect :attr:`issues` for details.
+
+    ``ok`` is ``True`` if and only if there are **no** ``"error"``-severity
+    issues; warnings and info entries do not affect it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ok: bool
+    """``True`` iff there are no ``"error"``-severity issues in :attr:`issues`.
+
+    This is the single gate a caller checks to decide whether a conversion
+    passed validation.  Warnings and info items are surfaced in :attr:`issues`
+    but do not flip ``ok`` to ``False``.
+    """
+
+    issues: list[ValidationIssue] = []
+    """All findings produced by the validation checks, in discovery order.
+
+    May be empty when the conversion is clean.  Callers that want only errors
+    can filter with ``[i for i in report.issues if i.severity == "error"]``.
+    """
+
+    error_count: int
+    """Number of ``"error"``-severity issues in :attr:`issues`.
+
+    Provided as a convenience so callers can display a summary without
+    iterating :attr:`issues`.  Must equal
+    ``sum(1 for i in issues if i.severity == "error")``.
+    """
+
+    warning_count: int
+    """Number of ``"warning"``-severity issues in :attr:`issues`.
+
+    Must equal ``sum(1 for i in issues if i.severity == "warning")``.
+    """
+
+    info_count: int
+    """Number of ``"info"``-severity issues in :attr:`issues`.
+
+    Must equal ``sum(1 for i in issues if i.severity == "info")``.
+    """

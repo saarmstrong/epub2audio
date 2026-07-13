@@ -12,6 +12,7 @@ Covers:
 from __future__ import annotations
 
 import re
+from collections import Counter
 
 from epub2audio.config import Settings
 from epub2audio.director import build_narration_plan
@@ -146,6 +147,61 @@ Case walked slowly."""
                 f"Word {word!r} from source not found in any segment. "
                 f"Segment words: {sorted(seg_words)}"
             )
+
+
+def test_word_multiset_completeness() -> None:
+    """Word multiset across all segments equals the multiset of the non-divider source.
+
+    **Invariant:** ``Counter(segment_words) == Counter(source_words)``
+
+    **Why exact multiset equality is correct here:**
+    ``normalize_text`` only replaces punctuation and special characters
+    (curly quotes, em-dashes, ligatures, non-breaking spaces) — it never
+    adds, removes, or changes alphabetic word tokens.  ``segment_text``
+    splits on whitespace/punctuation boundaries and never drops or duplicates
+    words.  Scene-break divider lines (e.g. ``* * *``) contain no alphabetic
+    tokens and are explicitly excluded from the source word collection.
+    Therefore the multiset of alphabetic tokens in all segments must exactly
+    equal the multiset of alphabetic tokens in the non-divider normalized
+    source text.
+
+    Using a chapter with repeated words ("the" appears multiple times and
+    once in different case, "the" / "the" should both count) ensures the
+    Counter comparison catches dropped duplicates that set membership misses.
+    """
+    # Deliberately repeats words so a set-only check would miss dropped duplicates.
+    chapter = """The rain the rain fell on the street.
+
+* * *
+
+Later the room the room was quiet.
+
+Case walked the walked path slowly."""
+
+    plans = build_narration_plan(chapter, 1)
+
+    # Collect word multiset from all segments.
+    seg_words: list[str] = []
+    for seg in _all_segs(plans):
+        seg_words.extend(re.findall(r"[A-Za-z']+", seg.text))
+    seg_counter = Counter(seg_words)
+
+    # Collect word multiset from normalized non-divider source.
+    normalized = normalize_text(chapter)
+    divider_re = re.compile(r"^[\s*#\u2022\u00b7.\-\u2014\u2013_=~]+$")
+    source_words: list[str] = []
+    for para in re.split(r"\n\s*\n+", normalized):
+        para = para.strip()
+        if not para or divider_re.match(para):
+            continue
+        source_words.extend(re.findall(r"[A-Za-z']+", para))
+    source_counter = Counter(source_words)
+
+    assert seg_counter == source_counter, (
+        f"Word multiset mismatch.\n"
+        f"  In segments but not source: {dict(seg_counter - source_counter)}\n"
+        f"  In source but not segments: {dict(source_counter - seg_counter)}"
+    )
 
 
 # ---------------------------------------------------------------------------
