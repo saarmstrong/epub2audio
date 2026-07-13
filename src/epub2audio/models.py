@@ -6,7 +6,7 @@ other epub2audio module.  All other modules may import from here.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -201,6 +201,139 @@ class AudioChunk(BaseModel):
     data: Any
     """NumPy ndarray of float32 samples, shape (n_samples,) or (channels, n_samples).
     Typed as ``Any`` because mypy strict mode cannot verify numpy array shapes."""
+
+
+# ---------------------------------------------------------------------------
+# Narration Director models
+# ---------------------------------------------------------------------------
+#
+# These models are the provider-neutral output of the Narration Director
+# (see docs/decisions/003-narration-pipeline.md).  They must never contain
+# engine-specific data (no SSML, no Kokoro tokens): a provider adapter is
+# responsible for translating a plan into provider-specific controls.  The
+# shape mirrors the illustrative JSON in Feature.md; field names use the
+# project-wide snake_case convention (e.g. ``pause_after_ms`` for the doc's
+# ``pauseAfterMs``) so serialized plans match every other model here.
+
+SegmentType = Literal["narration", "dialogue"]
+"""Kind of a narration segment: plain narration or attributed dialogue."""
+
+
+class EmphasisHint(BaseModel):
+    """A provider-neutral hint that a phrase should be emphasized.
+
+    The Director locates phrases worth stressing; a provider adapter decides
+    how to realize the emphasis (e.g. Kokoro punctuation, Azure SSML
+    ``<emphasis>``).  ``phrase`` must be a verbatim substring of the owning
+    segment's ``text`` — the Director never rewrites prose.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    phrase: str
+    """Verbatim substring of the segment text to emphasize."""
+
+    level: Literal["light", "moderate", "strong"]
+    """Relative emphasis strength; mapped to provider controls by the adapter."""
+
+
+class PronunciationHint(BaseModel):
+    """A reference from a segment to a pronunciation-lexicon entry.
+
+    The Director only *flags* which terms appear in a segment; the actual
+    pronunciation (IPA / phonemes / substitution) lives in the pronunciation
+    subsystem (Milestone 10) and is applied by the provider adapter.  Keeping
+    the pronunciation itself out of the plan preserves provider neutrality.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    term: str
+    """Verbatim substring of the segment text that has a lexicon entry."""
+
+
+class NarrationDirection(BaseModel):
+    """Provider-neutral delivery instruction for a scene or a single segment.
+
+    Used both as a scene-level default (``NarrationPlan.default_direction``)
+    and as an optional per-segment override when the emotion of a segment
+    diverges significantly from its scene.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mood: str
+    """Free-form mood/tone label, e.g. ``"restrained cyberpunk noir"``."""
+
+    pace: float
+    """Relative speaking pace; ``1.0`` is neutral, < 1.0 slower, > 1.0 faster."""
+
+    intensity: float
+    """Emotional intensity in the range ``0.0`` (flat) to ``1.0`` (peak)."""
+
+
+class NarrationSegment(BaseModel):
+    """One directed unit of narration produced by the Director.
+
+    Carries the original text plus provider-neutral delivery annotations.
+    ``text`` is always derived from the source EPUB text (a normalized
+    substring) — the Director annotates but never rewrites prose and never
+    invents dialogue.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    """Stable identifier for the segment (content-derived; used for resume)."""
+
+    type: SegmentType
+    """Whether this segment is narration or attributed dialogue."""
+
+    speaker: str
+    """Likely speaker label; ``"narrator"`` for narration, a best-guess
+    character label (or ``"unknown"``) for dialogue."""
+
+    text: str
+    """The narration text to be spoken (a normalized substring of the source)."""
+
+    direction: NarrationDirection | None
+    """Per-segment delivery override, or ``None`` to inherit the scene default."""
+
+    pause_after_ms: int
+    """Silence to insert after this segment, in milliseconds."""
+
+    pace: float
+    """Effective speaking pace for this segment (scene default unless overridden)."""
+
+    emphasis: list[EmphasisHint]
+    """Phrases within ``text`` to emphasize (possibly empty)."""
+
+    pronunciation_hints: list[PronunciationHint]
+    """Lexicon terms occurring in ``text`` (possibly empty)."""
+
+
+class NarrationPlan(BaseModel):
+    """The Director's provider-neutral plan for one scene of one chapter.
+
+    A chapter is analyzed into one or more scenes; each scene yields a
+    :class:`NarrationPlan` with a single ``default_direction`` and its ordered
+    segments.  Local overrides live on individual segments only when the
+    emotion changes significantly, keeping narration consistent within a scene.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    chapter: int
+    """1-based index of the chapter this plan belongs to."""
+
+    scene: int
+    """1-based index of the scene within the chapter."""
+
+    default_direction: NarrationDirection
+    """Scene-level delivery instruction applied to every segment by default."""
+
+    segments: list[NarrationSegment]
+    """Ordered narration segments for this scene."""
 
 
 # ---------------------------------------------------------------------------
