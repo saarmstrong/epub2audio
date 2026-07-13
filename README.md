@@ -4,6 +4,7 @@ Convert EPUB ebooks to MP3 audiobooks using Kokoro TTS.
 
 ## Features
 
+- **Two output formats** — one MP3 per logical chapter, or a single `.m4b` audiobook with embedded chapter markers (`--format m4b`)
 - **One MP3 per logical chapter** — automatic chapter detection from EPUB structure
 - **Multi-file chapter merging** — combines split chapters into single tracks
 - **Single-file chapter splitting** — separates combined chapters by TOC fragments
@@ -70,7 +71,10 @@ epub2audio doctor
 
 ## CLI Reference
 
-### `convert` — Convert EPUB to MP3
+### `convert` — Convert EPUB to audiobook
+
+With `--format mp3` (default) produces one MP3 per chapter. With `--format m4b`
+produces a single `.m4b` audiobook (AAC) with embedded chapter markers and cover art.
 
 ```bash
 epub2audio convert BOOK.epub [OPTIONS]
@@ -80,7 +84,8 @@ Options:
   --voice TEXT             Kokoro voice [default: af_heart]
   --language TEXT          Language code [default: from EPUB or en-us]
   --speed FLOAT            Speech speed [default: 1.0]
-  --bitrate TEXT           MP3 bitrate [default: 96k]
+  --format TEXT            Output format: mp3 or m4b [default: mp3]
+  --bitrate TEXT           Audio bitrate [default: 96k]
   --sample-rate INT        Audio sample rate [default: 24000]
   --normalize / --no-normalize  Loudness normalization [default: enabled]
   --resume / --no-resume   Resume interrupted conversion [default: enabled]
@@ -163,6 +168,13 @@ audiobooks/
     ├── 002 - Chapter Two.mp3
     ├── ...
     └── conversion-report.json
+```
+
+With `--format m4b`, a single file is written instead of per-chapter MP3s:
+
+```
+audiobooks/
+└── Book Title.m4b        # single AAC audiobook with embedded chapter markers
 ```
 
 ## Troubleshooting

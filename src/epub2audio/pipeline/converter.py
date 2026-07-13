@@ -27,12 +27,14 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
+from epub2audio.audio.chapters_meta import write_ffmetadata_chapters
 from epub2audio.audio.chunks import concat_chunks, save_chunk
 from epub2audio.audio.concatenate import concatenate_wavs
-from epub2audio.audio.encode import encode_mp3
+from epub2audio.audio.encode import encode_aac, encode_mp3
 from epub2audio.audio.metadata import embed_metadata
+from epub2audio.audio.mux_m4b import build_m4b
 from epub2audio.audio.normalize import normalize_loudness
-from epub2audio.audio.validate import probe_duration, validate_mp3
+from epub2audio.audio.validate import probe_duration, validate_audio, validate_mp3
 from epub2audio.config import Settings
 from epub2audio.epub.cleanup import xhtml_to_text
 from epub2audio.epub.cover import extract_cover
@@ -40,6 +42,7 @@ from epub2audio.epub.reader import open_epub
 from epub2audio.models import (
     AudioChunk,
     Chapter,
+    ChapterMarker,
     ChapterResult,
     ConversionManifest,
     ConversionPlan,
@@ -61,7 +64,7 @@ from epub2audio.pipeline.resume import (
 from epub2audio.text.normalize import normalize_text
 from epub2audio.text.segment import segment_text
 from epub2audio.tts.base import TTSEngine
-from epub2audio.utils.names import sanitize_filename
+from epub2audio.utils.names import sanitize_book_filename, sanitize_filename
 
 log = logging.getLogger(__name__)
 
@@ -325,8 +328,6 @@ def _process_chapter(
     # ------------------------------------------------------------------ #
     chapter_wav = chapter_work / "chapter.wav"
     chapter_wav_norm = chapter_work / "chapter_norm.wav"
-    output_filename = sanitize_filename(chapter.title, chapter_index)
-    output_mp3 = output_dir / output_filename
     output_dir.mkdir(parents=True, exist_ok=True)
 
     concatenate_wavs(seg_wav_paths, chapter_wav)
@@ -337,23 +338,37 @@ def _process_chapter(
     else:
         encode_src = chapter_wav
 
-    encode_mp3(
-        encode_src,
-        output_mp3,
-        bitrate=settings.bitrate,
-        sample_rate=settings.sample_rate,
-    )
+    if settings.output_format == "m4b":
+        # Per-chapter AAC segment persisted in the work dir; the single .m4b is
+        # muxed after all chapters succeed.  No per-chapter metadata here.
+        produced_path = chapter_work / "chapter.m4a"
+        encode_aac(
+            encode_src,
+            produced_path,
+            bitrate=settings.bitrate,
+            sample_rate=settings.sample_rate,
+        )
+        validate_audio(
+            produced_path,
+            expected_codec="aac",
+            expected_sample_rate=settings.sample_rate,
+        )
+    else:
+        output_filename = sanitize_filename(chapter.title, chapter_index)
+        produced_path = output_dir / output_filename
+        encode_mp3(
+            encode_src,
+            produced_path,
+            bitrate=settings.bitrate,
+            sample_rate=settings.sample_rate,
+        )
+        validate_mp3(produced_path, expected_sample_rate=settings.sample_rate)
 
     # ------------------------------------------------------------------ #
-    # Validation                                                           #
-    # ------------------------------------------------------------------ #
-    validate_mp3(output_mp3, expected_sample_rate=settings.sample_rate)
-
-    # ------------------------------------------------------------------ #
-    # Probe the final MP3 for its real duration                            #
+    # Probe the produced file for its real duration                        #
     # ------------------------------------------------------------------ #
     try:
-        duration_seconds = probe_duration(output_mp3)
+        duration_seconds = probe_duration(produced_path)
     except Exception as exc:
         log.warning("Chapter %r: duration probe failed: %s", chapter.chapter_id, exc)
         duration_seconds = 0.0
@@ -374,7 +389,7 @@ def _process_chapter(
             chapter_id=chapter.chapter_id,
             duration_seconds=duration_seconds,
             warnings=warnings,
-            output_path=str(output_mp3),
+            output_path=str(produced_path),
         ),
         completed_segments,
     )
@@ -552,30 +567,32 @@ def convert_epub(
             # Accumulate newly completed segments from this chapter
             all_new_segments.extend(chapter_segments)
 
-            # Embed metadata now that we have book_metadata in scope
+            # Metadata: MP3 gets per-file ID3 tags + cover embedded now.
+            # For M4B the tags/chapters/cover are applied once in the final mux.
             if result.output_path is not None:
-                mp3_path = Path(result.output_path)
-                try:
-                    embed_metadata(
-                        mp3_path=mp3_path,
-                        metadata=book_metadata,
-                        track_number=idx,
-                        total_tracks=total_chapters,
-                        chapter_title=chapter.title,
-                        cover_bytes=cover_bytes,
-                    )
-                except Exception as meta_exc:
-                    log.warning(
-                        "Chapter %r: metadata embedding failed: %s",
-                        chapter.chapter_id,
-                        meta_exc,
-                    )
-                    result = ChapterResult(
-                        chapter_id=result.chapter_id,
-                        duration_seconds=result.duration_seconds,
-                        warnings=[*result.warnings, f"Metadata embedding failed: {meta_exc}"],
-                        output_path=result.output_path,
-                    )
+                if settings.output_format == "mp3":
+                    mp3_path = Path(result.output_path)
+                    try:
+                        embed_metadata(
+                            mp3_path=mp3_path,
+                            metadata=book_metadata,
+                            track_number=idx,
+                            total_tracks=total_chapters,
+                            chapter_title=chapter.title,
+                            cover_bytes=cover_bytes,
+                        )
+                    except Exception as meta_exc:
+                        log.warning(
+                            "Chapter %r: metadata embedding failed: %s",
+                            chapter.chapter_id,
+                            meta_exc,
+                        )
+                        result = ChapterResult(
+                            chapter_id=result.chapter_id,
+                            duration_seconds=result.duration_seconds,
+                            warnings=[*result.warnings, f"Metadata embedding failed: {meta_exc}"],
+                            output_path=result.output_path,
+                        )
 
                 successful_chapter_ids.append(chapter.chapter_id)
 
@@ -606,6 +623,68 @@ def convert_epub(
         write_manifest(manifest, manifest_path)
 
     # ------------------------------------------------------------------ #
+    # M4B assembly: mux per-chapter AAC segments into one .m4b            #
+    # (must run before work-dir cleanup, which removes the segments).      #
+    # ------------------------------------------------------------------ #
+    m4b_output_path: str | None = None
+    m4b_markers: list[ChapterMarker] = []
+    if settings.output_format == "m4b":
+        chapter_audio: list[Path] = []
+        cursor_ms = 0
+        for chapter, result in zip(chapters, chapter_results, strict=True):
+            if result.output_path is None:
+                continue
+            start_ms = cursor_ms
+            end_ms = start_ms + round(result.duration_seconds * 1000)
+            m4b_markers.append(
+                ChapterMarker(
+                    chapter_id=result.chapter_id,
+                    title=chapter.title,
+                    start_ms=start_ms,
+                    end_ms=end_ms,
+                )
+            )
+            chapter_audio.append(Path(result.output_path))
+            cursor_ms = end_ms
+
+        if chapter_audio:
+            ffmeta_path = work_root / "chapters.ffmeta"
+            write_ffmetadata_chapters(m4b_markers, book_metadata, ffmeta_path)
+            m4b_path = output_dir / sanitize_book_filename(book_metadata.title, ".m4b")
+            try:
+                build_m4b(
+                    chapter_audio=chapter_audio,
+                    markers=m4b_markers,
+                    metadata=book_metadata,
+                    ffmeta_path=ffmeta_path,
+                    output_m4b=m4b_path,
+                    cover_bytes=cover_bytes,
+                )
+                validate_audio(
+                    m4b_path,
+                    expected_codec="aac",
+                    expected_sample_rate=settings.sample_rate,
+                    expected_chapters=len(m4b_markers),
+                )
+                m4b_output_path = str(m4b_path)
+            except Exception as mux_exc:
+                log.error("M4B assembly failed: %s", mux_exc)
+                all_errors.append(f"M4B assembly failed: {mux_exc}")
+                # Leave the work dir intact so --resume can retry the mux.
+                successful_chapter_ids = []
+
+        # Audio now lives inside the single .m4b; per-chapter files do not exist.
+        chapter_results = [
+            ChapterResult(
+                chapter_id=r.chapter_id,
+                duration_seconds=r.duration_seconds,
+                warnings=r.warnings,
+                output_path=None,
+            )
+            for r in chapter_results
+        ]
+
+    # ------------------------------------------------------------------ #
     # Post-run cleanup of persistent work dirs                             #
     # ------------------------------------------------------------------ #
     if not settings.keep_intermediates:
@@ -634,6 +713,8 @@ def convert_epub(
         total_duration_seconds=total_duration,
         warnings=all_warnings,
         errors=all_errors,
+        output_path=m4b_output_path,
+        chapter_markers=m4b_markers,
     )
 
     # Write report JSON

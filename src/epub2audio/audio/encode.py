@@ -68,3 +68,61 @@ def encode_mp3(
     except Exception:
         Path(tmp_path).unlink(missing_ok=True)
         raise
+
+
+def encode_aac(
+    input_wav: Path,
+    output_m4a: Path,
+    *,
+    bitrate: str = "64k",
+    sample_rate: int = 24000,
+) -> None:
+    """Encode a WAV file to AAC in an MP4 container using FFmpeg.
+
+    Produces the per-chapter audio used to assemble a single ``.m4b``
+    audiobook.  Uses FFmpeg's native ``aac`` encoder so no additional build
+    dependency (``libfdk_aac``) is required.
+
+    The output is written atomically: FFmpeg writes to a ``.tmp`` sidecar file
+    first, which is then renamed into place via :func:`os.replace`.
+
+    Args:
+        input_wav: Path to the source WAV file.
+        output_m4a: Destination MP4/AAC file path (typically ``*.m4a``).
+            Parent directories are created automatically.
+        bitrate: AAC bitrate string, e.g. ``"64k"`` or ``"96k"``.
+        sample_rate: Output sample rate in Hz.  The audio is resampled if the
+            input differs.
+
+    Raises:
+        MissingDependencyError: If ``ffmpeg`` is not on ``PATH``.
+        subprocess.CalledProcessError: If FFmpeg exits with a non-zero code.
+        OSError: If the output directory cannot be created or the rename fails.
+    """
+    output_m4a.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = output_m4a.with_suffix(output_m4a.suffix + ".tmp")
+
+    args = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(input_wav),
+        "-codec:a",
+        "aac",
+        "-b:a",
+        bitrate,
+        "-ar",
+        str(sample_rate),
+        "-ac",
+        "1",  # mono
+        "-f",
+        "mp4",  # explicit format: FFmpeg can't infer from .tmp extension
+        str(tmp_path),
+    ]
+
+    try:
+        run_command(args)
+        os.replace(tmp_path, output_m4a)
+    except Exception:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise

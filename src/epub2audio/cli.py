@@ -169,7 +169,12 @@ def convert(
     voice: str = typer.Option("af_heart", "--voice", help="Kokoro voice identifier."),
     language: str = typer.Option("en-us", "--language", help="BCP-47 language tag."),
     speed: float = typer.Option(1.0, "--speed", help="TTS speed multiplier (0.25–4.0)."),
-    bitrate: str = typer.Option("96k", "--bitrate", help="MP3 bitrate, e.g. '96k'."),
+    output_format: str = typer.Option(
+        "mp3",
+        "--format",
+        help="Output format: 'mp3' (one file per chapter) or 'm4b' (single audiobook).",
+    ),
+    bitrate: str = typer.Option("96k", "--bitrate", help="Audio bitrate, e.g. '96k'."),
     sample_rate: int = typer.Option(24000, "--sample-rate", help="Output sample rate in Hz."),
     normalize: bool = typer.Option(
         True, "--normalize/--no-normalize", help="Apply EBU R128 loudness normalization."
@@ -192,10 +197,12 @@ def convert(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose logging."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output."),
 ) -> None:
-    """Convert an EPUB ebook to MP3 audiobook chapters.
+    """Convert an EPUB ebook to an audiobook.
 
-    Produces one MP3 file per logical chapter in reading order.  Chapter
-    files are named ``NNN - Chapter Title.mp3`` and written to *output*.
+    With ``--format mp3`` (default) produces one MP3 file per logical chapter
+    in reading order, named ``NNN - Chapter Title.mp3``.  With ``--format m4b``
+    produces a single ``.m4b`` audiobook with embedded chapter markers.
+    Output is written to *output*.
 
     TTS engine selection: uses Kokoro if available, otherwise falls back to
     the built-in ``FakeTTSEngine`` (silent audio, useful for testing the
@@ -230,12 +237,20 @@ def convert(
     # ------------------------------------------------------------------ #
     # Build settings                                                       #
     # ------------------------------------------------------------------ #
+    fmt = output_format.strip().lower()
+    if fmt not in ("mp3", "m4b"):
+        _err_console.print(
+            f"[red]Error:[/red] invalid --format {output_format!r} (expected 'mp3' or 'm4b')."
+        )
+        raise typer.Exit(code=1)
+
     base_settings = load_settings(config)
     settings = base_settings.model_copy(
         update={
             "voice": voice,
             "language": language,
             "speed": speed,
+            "output_format": fmt,
             "bitrate": bitrate,
             "sample_rate": sample_rate,
             "normalize": normalize,
@@ -267,6 +282,7 @@ def convert(
         )
         _console.print(f"  Chapters to convert: [bold]{len(chapters)}[/bold]")
         _console.print(f"  Output directory:    [bold]{output}[/bold]")
+        _console.print(f"  Format:              [bold]{fmt}[/bold]")
         _console.print(f"  Voice / language:    {voice} / {language}")
         _console.print(f"  Normalize:           {normalize}")
         _console.print()
@@ -332,13 +348,23 @@ def convert(
     # Summary                                                              #
     # ------------------------------------------------------------------ #
     if not quiet:
-        successful = sum(1 for r in report.chapter_results if r.output_path is not None)
-        failed = len(report.chapter_results) - successful
-        _console.print(
-            f"\n[green]Done.[/green] {successful} chapter(s) converted"
-            + (f", [red]{failed} failed[/red]" if failed else "")
-            + "."
-        )
+        if settings.output_format == "m4b":
+            if report.output_path is not None:
+                _console.print(
+                    f"\n[green]Done.[/green] Audiobook written to "
+                    f"[bold]{report.output_path}[/bold] "
+                    f"({len(report.chapter_markers)} chapter(s))."
+                )
+            else:
+                _console.print("\n[red]M4B assembly did not produce an output file.[/red]")
+        else:
+            successful = sum(1 for r in report.chapter_results if r.output_path is not None)
+            failed = len(report.chapter_results) - successful
+            _console.print(
+                f"\n[green]Done.[/green] {successful} chapter(s) converted"
+                + (f", [red]{failed} failed[/red]" if failed else "")
+                + "."
+            )
         if report.errors:
             for err in report.errors:
                 _err_console.print(f"[red]Error:[/red] {err}")

@@ -283,6 +283,29 @@ class ChapterResult(BaseModel):
     """Absolute path to the final MP3 file, or None if synthesis failed."""
 
 
+class ChapterMarker(BaseModel):
+    """Start/end offsets of one chapter inside a single audiobook file.
+
+    Used by the M4B output format, where every chapter lives inside one
+    container as a timestamped marker rather than as a separate file.  Offsets
+    are expressed in milliseconds against a ``1/1000`` timebase.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    chapter_id: str
+    """Matches ``Chapter.chapter_id``."""
+
+    title: str
+    """Human-readable chapter title written into the container's chapter tag."""
+
+    start_ms: int
+    """Inclusive chapter start offset in milliseconds."""
+
+    end_ms: int
+    """Exclusive chapter end offset in milliseconds."""
+
+
 class ConversionReport(BaseModel):
     """Final report written to the output directory after a conversion run.
 
@@ -306,3 +329,9 @@ class ConversionReport(BaseModel):
 
     errors: list[str]
     """All fatal or partial-failure error messages."""
+
+    output_path: str | None = None
+    """Path to the single M4B artifact, or None for per-chapter MP3 output."""
+
+    chapter_markers: list[ChapterMarker] = []
+    """Chapter offsets inside the single M4B file (empty for MP3 output)."""

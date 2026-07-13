@@ -6,4 +6,5 @@ Format: `NNN-short-title.md`
 
 ## Index
 
-_No decisions recorded yet._
+- [001 — AudioChunk: frozen=False exception](001-audiochunk-frozen-exception.md)
+- [002 — M4B output format via an assembler strategy](002-m4b-output-format.md)

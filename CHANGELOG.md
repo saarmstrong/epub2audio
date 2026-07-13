@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- M4B output format (`--format m4b`): a single `.m4b` audiobook (AAC) with
+  embedded chapter markers, book-level tags, and cover art. The default
+  remains one MP3 per chapter (`--format mp3`).
+- Per-chapter AAC segments are cached under `.epub2audio-work/`, so a failed
+  final mux resumes without re-synthesizing audio.
+
 ## [0.1.0] - 2026-07-12
 
 ### Added

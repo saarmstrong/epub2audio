@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     speed: Annotated[float, Field(ge=0.25, le=4.0)] = Field(
         default=1.0, description="TTS speed multiplier (0.25–4.0)."
     )
+    output_format: Literal["mp3", "m4b"] = Field(
+        default="mp3",
+        description="Output container: per-chapter MP3 files ('mp3') or a single M4B ('m4b').",
+    )
     bitrate: str = Field(default="96k", description="MP3 output bitrate (e.g. '96k').")
     sample_rate: int = Field(default=24000, description="Audio sample rate in Hz.")
     normalize: bool = Field(default=True, description="Apply loudness normalisation.")
@@ -48,6 +52,14 @@ class Settings(BaseSettings):
         default=False,
         description="Keep intermediate segment WAV files after successful conversion.",
     )
+
+    @field_validator("output_format", mode="before")
+    @classmethod
+    def normalize_output_format(cls, v: Any) -> Any:
+        """Lower-case and strip the output format so 'MP3'/'M4B' are accepted."""
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
 
     @field_validator("bitrate")
     @classmethod

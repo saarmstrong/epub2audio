@@ -87,6 +87,35 @@ def sanitize_filename(title: str, index: int) -> str:
     return full
 
 
+def sanitize_book_filename(title: str, extension: str) -> str:
+    """Return a sanitized book-level filename ``Title<extension>`` (no index prefix).
+
+    Used for single-file outputs such as an M4B audiobook, where there is no
+    per-chapter numeric prefix.  Applies the same forbidden-character,
+    trailing-dot, length, and Windows-reserved-name handling as
+    :func:`sanitize_filename`.
+
+    Args:
+        title: Raw book title (may contain any characters).
+        extension: File extension including the leading dot, e.g. ``".m4b"``.
+
+    Returns:
+        A safe filename string including *extension*.
+    """
+    safe_title = _FORBIDDEN_RE.sub("_", title).rstrip(". ")
+    if not safe_title:
+        safe_title = "audiobook"
+
+    max_title_len = _MAX_FILENAME_LENGTH - len(extension)
+    if len(safe_title) > max_title_len:
+        safe_title = safe_title[:max_title_len].rstrip(". ")
+
+    if safe_title.upper() in _WINDOWS_RESERVED:
+        safe_title = safe_title + "_"
+
+    return safe_title + extension
+
+
 def make_unique(names: list[str]) -> list[str]:
     """Append ``-2``, ``-3``, … suffixes to deduplicate a list of filenames.
 

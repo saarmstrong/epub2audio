@@ -1,14 +1,78 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-12 (M6 Reviewer FINAL sign-off — project complete)_
+_Last updated: 2026-07-12 (M7 M4B output format — Reviewer-approved, complete)_
 
 ---
 
 ## Current Milestone
 
-**Milestone 6** — Release readiness (docs, CI, packaging) — ✅ Complete (Reviewer-approved 2026-07-12)
+**Milestone 7** — M4B output format — ✅ Complete (Reviewer-approved 2026-07-12)
 
-🎉 **All milestones complete. epub2audio project is closed.**
+M1–M6 remain complete. M7 adds a second output format (`--format m4b`) alongside
+the existing per-chapter MP3 output.
+
+### M7 — what landed
+
+- `Settings.output_format: Literal["mp3", "m4b"]` (default `"mp3"`); CLI `--format`.
+- New `ChapterMarker` model; `ConversionReport` gains `output_path` +
+  `chapter_markers` for the single-file M4B artifact.
+- Audio building blocks: `audio/encode.encode_aac`, `audio/chapters_meta.py`
+  (FFmetadata chapter file), `audio/mux_m4b.py` (concat + mux + cover),
+  `audio/validate.validate_audio` (codec-parameterized + chapter-count check;
+  `validate_mp3` kept as a wrapper).
+- `utils/names.sanitize_book_filename` for the book-level `.m4b` name.
+- `pipeline/converter.py`: per-chapter synthesis/resume unchanged; only final
+  assembly forks on `output_format`. M4B encodes per-chapter AAC into the
+  persistent work dir, then muxes one `.m4b` before work-dir cleanup, so a
+  failed mux resumes without re-synthesis (segment-level resume preserved).
+- Docs: `docs/decisions/002-m4b-output-format.md` (Accepted), README + CHANGELOG.
+
+### M7 — verification on this machine (FFmpeg + Kokoro present)
+
+- `uv run pytest tests/ -q` → **214 passed, 6 skipped, 1 xfailed** (10 new M4B
+  tests: chapters-meta, encode_aac, validate_m4b, e2e m4b).
+- `uv run mypy src/epub2audio` → 0 errors (41 source files, strict).
+- `uv run ruff check` + `ruff format --check` → clean.
+- `epub2audio convert tests/fixtures/simple_epub3.epub -o /tmp/m4btest --format m4b`
+  → single `Test Book.m4b`, 2 contiguous chapters (Chapter One 0–197.575s,
+  Chapter Two 197.575–377.225s), AAC audio, book tags (album/artist/genre),
+  cover art attached_pic. MP3 default path unchanged (M1–M6 tests green).
+
+🎉 M1–M7 complete; the M4B output format is Reviewer-approved.
+
+---
+
+## Reviewer Sign-off — Milestone 7 (2026-07-12) — M4B output format
+
+**Result: APPROVED.**
+
+Gates (FFmpeg 8.1.2 + Kokoro present): `pytest tests/ -q` → 214 passed / 6 skipped
+/ 1 xfailed; `mypy src/epub2audio` → 0 errors (41 files); `ruff check` +
+`ruff format --check` clean (71 files).
+
+Verified end-to-end: `convert --format m4b` produces a single `.m4b` with 2
+contiguous chapters (correct titles/order), aac mono 24 kHz audio, attached-pic
+cover, and book-level tags; report carries `output_path` + `chapter_markers` with
+per-chapter `output_path=null`. The `bin_data` stream is confirmed to be the
+QuickTime chapter track (required for navigation; `-map_chapters -1` removes it →
+0 chapters) — accepted. MP3 default path confirmed unchanged (per-chapter
+`NNN - Title.mp3`, ID3 tags + cover). `--help` shows `--format`.
+
+Boundaries/security clean: no `epub/` imports in `audio/`; only guarded `kokoro`
+import in `doctor`; no `shell=True`; all FFmpeg via argument arrays; atomic writes
+in all new outputs; no body text in logs. Decision record
+`002-m4b-output-format.md` = Accepted.
+
+Reviewer fix: corrected malformed `.gitignore` (`./audiobooks` matched nothing)
+to properly ignore `audiobooks/` and `__pycache__/`.
+
+Parent follow-up actioned: the 62 already-committed `.pyc` files were untracked
+(`git rm --cached`); `.gitignore` prevents future ones.
+
+Non-blocking observation (accepted for v1): M4B chapter offsets are derived by
+summing per-chapter probed AAC durations rather than the muxed timeline, so AAC
+encoder priming/padding could introduce sub-frame drift across very long books.
+Exact for the current fixtures.
 
 ---
 
@@ -23,6 +87,7 @@ _Last updated: 2026-07-12 (M6 Reviewer FINAL sign-off — project complete)_
 | 4 | Reliability (resume, manifest, report) | ✅ Complete | Reviewer-approved 2026-07-12; DEFECT-003 fixed; 145 pass / 24 skipped, all gates green |
 | 5 | Chapter-detection hardening | ✅ Complete | Reviewer-approved 2026-07-12; detection layer done + 77 epub tests pass, all M5 gates green. Product wiring tracked as DEFECT-004 (M6 follow-up) |
 | 6 | Release readiness (docs, CI, packaging) | ✅ Complete | Reviewer-approved 2026-07-12; DEFECT-004 + DEFECT-005 fixed; README/CHANGELOG/LICENSE added; 204 pass / 6 skipped / 1 xfailed, all gates green |
+| 7 | M4B output format | ✅ Complete | Reviewer-approved 2026-07-12; `--format m4b` single-file audiobook; 214 pass / 6 skipped / 1 xfailed, all gates green |
 
 ---
 
