@@ -170,14 +170,14 @@ _Carry-forward from M8 review (non-blocking):_
 
 ## Milestone 12 — Additive Restructure Reconciliation + Config + Docs
 
-- [ ] `M12-01` — Add `output/` + `metadata/` thin re-export shims toward Feature.md layout (keep `src/` importable)
-- [ ] `M12-02` — `config.py`: add `provider`, `scene_analysis`, and `output_format: both`
-- [ ] `M12-03` — Wire `output_format: both` (emit MP3 and M4B in one run)
-- [ ] `M12-04` — Write `docs/architecture.md` narration-pipeline section (deliverable #6)
-- [ ] `M12-05` — Update README + CHANGELOG + example `epub2audio.toml`
-- [ ] `M12-06` — Reviewer: verify all Feature.md deliverables (1–7) satisfied
+- [x] `M12-01` — Add `output/` + `metadata/` thin re-export shims toward Feature.md layout (keep `src/` importable)
+- [x] `M12-02` — `config.py`: add `provider`, `scene_analysis`, and `output_format: both`
+- [x] `M12-03` — Wire `output_format: both` (emit MP3 and M4B in one run)
+- [x] `M12-04` — Write `docs/architecture.md` narration-pipeline section (deliverable #6)
+- [x] `M12-05` — Update README + CHANGELOG + example `epub2audio.toml`
+- [x] `M12-06` — Reviewer: verify all Feature.md deliverables (1–7) satisfied
 
 _Carry-forward from M11 review (non-blocking):_
-- [ ] `M12-07` — Validation: flag a `None` M4B `output_path` as `missing_output_file` when chapters exist (currently only caught indirectly via `report.errors`)
-- [ ] `M12-08` — Tests: broaden the `validation/` AST import-boundary test to cover `import x` statements and `__init__.py` (not just `ImportFrom` in `checks.py`)
-- [ ] `M12-09` — Consider a `model_validator` on `ValidationReport` to prevent count drift on externally-constructed/deserialized reports (or document the ADR-006 tradeoff explicitly)
+- [x] `M12-07` — Validation: flag a `None` M4B `output_path` as `missing_output_file` when chapters exist (currently only caught indirectly via `report.errors`)
+- [x] `M12-08` — Tests: broaden the `validation/` AST import-boundary test to cover `import x` statements and `__init__.py` (not just `ImportFrom` in `checks.py`)
+- [x] `M12-09` — Consider a `model_validator` on `ValidationReport` to prevent count drift on externally-constructed/deserialized reports (or document the ADR-006 tradeoff explicitly)

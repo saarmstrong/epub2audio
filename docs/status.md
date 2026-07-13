@@ -1,20 +1,33 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-13 (M11 optional validation stage — ✅ complete; independent Reviewer-approved)_
+_Last updated: 2026-07-13 (M12 final reconciliation + Feature.md deliverables — ✅ complete; independent Reviewer-approved; all 7 deliverables satisfied)_
 
 ---
 
 ## Current Milestone
 
-**Milestones 8–11** — Narration Director + provider-adapter pipeline +
-pronunciation + validation — ✅ Complete (independent Reviewer sign-off each).
-**Milestone 12** — 📋 Planned (design in `docs/decisions/003-narration-pipeline.md`).
+**Milestones 8–12** — Full `Feature.md` narration pipeline — ✅ Complete
+(independent Reviewer sign-off on each milestone).
 
-M1–M11 complete. The `Feature.md` vision is being delivered as an **additive,
-rule-based** evolution (no rename of existing packages, no LLM in v1). M4B
-(Feature.md goal #1) shipped in M7; the Director (M8), provider-adapter layer
-(M9), pronunciation dictionary (M10), and the optional `--validate` quality
-stage (M11) are all wired end-to-end.
+**All Feature.md deliverables satisfied (Reviewer-verified 2026-07-13):**
+1. Refactored architecture (additive three-layer Director → Provider → Engine)
+2. Working MP3 output (unchanged; per-chapter MP3s with ID3 + cover)
+3. Working M4B output (`--format m4b`; AAC, chapter markers, book tags, cover)
+4. Narration Director abstraction (rule-based, deterministic, provider-neutral)
+5. Kokoro provider implementation (`KokoroProvider` wrapping `KokoroTTSEngine`)
+6. Architecture documentation (`docs/architecture.md` narration-pipeline section)
+7. Unit tests for narration plans, metadata, M4B chapter creation, and more
+
+M1–M12 complete. The codebase now implements the full `Feature.md` vision as
+an **additive, rule-based** evolution with no package renames and no LLM.
+
+### What’s in M12
+- `output_format: "both"` — per-chapter MP3s + single M4B in one run
+- `provider`, `scene_analysis` settings (ADR-007)
+- `ValidationReport @model_validator` prevents count drift (M12-09/ADR-006 amendment)
+- `output/` + `metadata/` additive re-export shims (M12-01)
+- Validation `both`-mode updates + M12-07 null M4B output_path guard
+- Architecture docs, README, CHANGELOG, `examples/epub2audio.toml`
 
 ### Planned scope (M8–M12)
 
@@ -34,6 +47,36 @@ Three-layer separation — **Director** (business logic, provider-neutral) →
 
 Tasks are enumerated in `tasks/backlog.md` (M8-01 … M12-06). Each milestone keeps
 the standard gates green and requires Reviewer sign-off before completion.
+
+## Reviewer Sign-off — Milestone 12 (2026-07-13) — Final reconciliation
+
+**Result: APPROVED** (independent fresh-context Reviewer; all 7 Feature.md
+deliverables verified end-to-end with real Kokoro + FFmpeg).
+
+Gates: `pytest tests/ -q` → **424 passed / 6 skipped / 1 xfailed**;
+`mypy src/epub2audio` → 0 errors (60 files, strict); `ruff check` +
+`ruff format --check` → clean (107 files).
+
+Feature.md deliverable verification (all ✔):
+1. Refactored architecture — clean three-layer separation, additive
+2. MP3 output — `convert book.epub` → `001 - Ch One.mp3`, ID3 + cover
+3. M4B output — `convert --format m4b` → `Book.m4b`, AAC, chapter markers, cover
+4. Narration Director — rule-based, deterministic, provider-neutral; 38 tests
+5. Kokoro provider — `KokoroProvider` adapter, Fake DI, pronunciation applied
+6. Architecture docs — full narration pipeline section in `docs/architecture.md`
+7. Tests — narration plans (38), metadata, M4B chapter creation, validation, wiring
+
+`--format both` end-to-end verified: per-chapter MP3s + single M4B produced
+from one synthesis pass; `validation-report.json` ok=True when both present.
+
+Non-blocking items (carry to future milestones):
+1. Silence insertion (`pause_after_ms` carried in `ProviderRequest` but not yet
+   applied between segments; deferred by design since M9).
+2. `test_provider_neutral_no_markup` in `tests/director/test_plan.py` scans
+   `model_dump_json()` for tag strings; a richer assertion (no `<` characters
+   at all, or a proper XML-tag regex) would be more precise.
+
+---
 
 ## Reviewer Sign-off — Milestone 11 (2026-07-13) — Optional validation stage
 
@@ -252,7 +295,7 @@ Exact for the current fixtures.
 | 9 | Provider-adapter abstraction + Kokoro adapter | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationProvider` Protocol + Kokoro adapter; Director wired into pipeline; 308 pass (+56), MP3/M4B verified unchanged |
 | 10 | Pronunciation subsystem | ✅ Complete | Reviewer-approved 2026-07-13 (after wiring-blocker fix); `pronunciation/` package + Director hints + Kokoro substitution, wired end-to-end via `pronunciation_dictionary`; 352 pass (+44), mypy/ruff clean |
 | 11 | Optional validation stage | ✅ Complete | Reviewer-approved 2026-07-13 (verified via real `convert --validate`); `validation/` package + `--validate` writes `validation-report.json`; 395 pass (+43), mypy/ruff clean |
-| 12 | Additive restructure + config + docs | 📋 Planned | `output/`+`metadata/` shims, `output_format: both`, architecture docs |
+| 12 | Additive restructure + config + docs | ✅ Complete | Reviewer-approved 2026-07-13; `output_format:both`, shims, config, validation `both`-mode, architecture docs, README, CHANGELOG; all 7 Feature.md deliverables satisfied; 424 pass (+29), mypy/ruff clean |
 
 ---
 
