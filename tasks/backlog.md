@@ -155,6 +155,7 @@ _Carry-forward from M8 review (non-blocking):_
 - [x] `M10-04` — `config.py`: add `pronunciation_dictionary` path setting
 - [x] `M10-05` — Tester: lexicon load + application tests; example `pronunciations.yaml`
 - [x] `M10-06` — Reviewer: verify hints are provider-neutral and applied only in adapters
+- [x] `M10-07` (review-found defect) — wire `pronunciation_dictionary` end-to-end: `convert_epub` loads the lexicon and threads it into `build_narration_plan`; + ffmpeg-gated e2e wiring tests; + `examples/pronunciations.yaml`. Independent Reviewer APPROVED (`c06c00c`).
 
 ---
 

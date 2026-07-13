@@ -72,6 +72,13 @@ Non-blocking (candidates for M11): strengthen the M9-09 completeness assertion
 to compare word multiset/count (not just set membership); theoretical
 sequential-substitution edge in `_apply_pronunciations` (low risk).
 
+**Re-review after fix (`c06c00c`): APPROVED — both blockers resolved.** Confirmed
+the lexicon is loaded once per run and threaded into every
+`build_narration_plan` call; the two ffmpeg-gated wiring tests are meaningful
+regression guards and passed; `examples/pronunciations.yaml` ships and all its
+forms load. Gates: 352 passed / 6 skipped / 1 xfailed; mypy 0 errors (56
+files); ruff clean (98 files).
+
 ---
 
 ## Reviewer Sign-off — Milestone 9 (2026-07-13) — Provider-adapter layer
