@@ -1,6 +1,6 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-12 (M8 rule-based Narration Director — implemented; awaiting Reviewer sign-off)_
+_Last updated: 2026-07-13 (M8 rule-based Narration Director — ✅ Reviewer-approved, complete)_
 
 ---
 
@@ -33,6 +33,33 @@ Three-layer separation — **Director** (business logic, provider-neutral) →
 
 Tasks are enumerated in `tasks/backlog.md` (M8-01 … M12-06). Each milestone keeps
 the standard gates green and requires Reviewer sign-off before completion.
+
+## Reviewer Sign-off — Milestone 8 (2026-07-13) — Narration Director
+
+**Result: APPROVED.**
+
+Gates: `pytest tests/ -q` → 252 passed / 6 skipped / 1 xfailed (+38 director
+tests); `mypy src/epub2audio` → 0 errors (47 files); `ruff check` +
+`ruff format --check` → clean (80 files).
+
+Verified: narration plans are deterministic and provider-neutral (no SSML /
+engine tokens); the "preserve original text / never invent dialogue" guarantee
+holds in the Director logic (every `NarrationSegment.text` comes straight from
+`segment_text(normalize_text(...))`; speaker falls back to `"unknown"`, never
+fabricated; emphasis phrases are verbatim substrings). Module boundaries clean:
+`director/` imports only `models` + `text/`; no provider/engine/epub imports, no
+`subprocess`/`shell`. Docstrings + type annotations present on all public
+symbols.
+
+Non-blocking observations carried to M9 (see `tasks/backlog.md`):
+1. `plan._pause_after_ms` re-segments text that is already a `TextSegment`
+   (redundant double segmentation) — pass the `TextSegment` to `get_pause`.
+2. `emphasis.py` carries a `# type: ignore[arg-type]`; typing the local
+   `_add(level: Literal[...])` removes it.
+3. Add an explicit end-to-end **completeness** assertion (all non-divider
+   narration text lands in some segment), not just substring containment.
+
+---
 
 ### M7 — what landed
 
@@ -111,7 +138,7 @@ Exact for the current fixtures.
 | 5 | Chapter-detection hardening | ✅ Complete | Reviewer-approved 2026-07-12; detection layer done + 77 epub tests pass, all M5 gates green. Product wiring tracked as DEFECT-004 (M6 follow-up) |
 | 6 | Release readiness (docs, CI, packaging) | ✅ Complete | Reviewer-approved 2026-07-12; DEFECT-004 + DEFECT-005 fixed; README/CHANGELOG/LICENSE added; 204 pass / 6 skipped / 1 xfailed, all gates green |
 | 7 | M4B output format | ✅ Complete | Reviewer-approved 2026-07-12; `--format m4b` single-file audiobook; 214 pass / 6 skipped / 1 xfailed, all gates green |
-| 8 | Narration data models + rule-based Director | 🔨 Implemented (awaiting review) | `NarrationPlan` models + `director/` package; scene-aware, deterministic; 252 pass (+38), mypy/ruff green |
+| 8 | Narration data models + rule-based Director | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationPlan` models + `director/` package; scene-aware, deterministic; 252 pass (+38), mypy/ruff green |
 | 9 | Provider-adapter abstraction + Kokoro adapter | 📋 Planned | `NarrationProvider` Protocol; Kokoro wraps `KokoroTTSEngine`; MP3/M4B unchanged |
 | 10 | Pronunciation subsystem | 📋 Planned | `pronunciations.yaml` lexicon; Director hints, adapters apply |
 | 11 | Optional validation stage | 📋 Planned | `--validate`; skipped text, timestamps, chapter-duration consistency |

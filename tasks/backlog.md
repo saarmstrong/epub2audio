@@ -127,7 +127,7 @@ _Design: `docs/decisions/003-narration-pipeline.md`. Rule-based (deterministic, 
 - [x] `M8-04` — TTS Engineer: dialogue detection + likely-speaker labelling (quote/attribution heuristics); reuse `text/segment.py`
 - [x] `M8-05` — TTS Engineer: fold `text/pauses.py` pause timing + emphasis hints into plan segments; never rewrite prose
 - [x] `M8-06` — Tester: `tests/director/` unit tests for narration plans (deliverable #7) incl. "text preserved / no invented dialogue" assertions
-- [ ] `M8-07` — Reviewer: verify plans are deterministic and provider-neutral (no SSML / engine tokens)
+- [x] `M8-07` — Reviewer: verify plans are deterministic and provider-neutral (no SSML / engine tokens)
 
 ---
 
@@ -139,6 +139,11 @@ _Design: `docs/decisions/003-narration-pipeline.md`. Rule-based (deterministic, 
 - [ ] `M9-04` — Audio Engineer: inject `NarrationProvider` into `pipeline/converter.py`; drive Director → render → synthesize; re-key segment resume on plan-segment hash
 - [ ] `M9-05` — Tester: adapter unit tests + boundary test (no analysis logic / cross-layer imports in `providers/`)
 - [ ] `M9-06` — Reviewer: verify MP3 + M4B outputs unchanged; adding a provider needs no pipeline/director edits
+
+_Carry-forward from M8 review (non-blocking):_
+- [ ] `M9-07` — Tidy: `director/plan._pause_after_ms` re-segments an already-segmented `TextSegment`; pass the `TextSegment` to `get_pause` instead of re-running `segment_text`
+- [ ] `M9-08` — Tidy: remove `# type: ignore[arg-type]` in `director/emphasis.py` by typing `_add(level: Literal["light","moderate","strong"])`
+- [ ] `M9-09` — Tester: add end-to-end **completeness** assertion (all non-divider narration text lands in some segment), not just substring containment
 
 ---
 
