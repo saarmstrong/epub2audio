@@ -58,11 +58,12 @@ def test_convert_epub_produces_two_mp3s(
     from epub2audio.config import Settings
     from epub2audio.models import ChapterResult, ConversionReport
     from epub2audio.pipeline.converter import convert_epub
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path)
-    engine = FakeTTSEngine()
-    report = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    provider = KokoroProvider(FakeTTSEngine())
+    report = convert_epub(simple_epub3_path, tmp_path, settings, provider)
 
     # 1. Exactly 2 MP3 files in output directory
     mp3_files = sorted(tmp_path.glob("*.mp3"))
@@ -111,10 +112,11 @@ def test_convert_epub_mp3s_are_in_reading_order(
 
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path)
-    convert_epub(simple_epub3_path, tmp_path, settings, FakeTTSEngine())
+    convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(FakeTTSEngine()))
 
     mp3_files = sorted(tmp_path.glob("*.mp3"))
     assert len(mp3_files) == 2
@@ -136,10 +138,11 @@ def test_convert_epub_report_metadata(
 
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path)
-    report = convert_epub(simple_epub3_path, tmp_path, settings, FakeTTSEngine())
+    report = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(FakeTTSEngine()))
 
     assert report.book_metadata.title == "Test Book"
     assert report.book_metadata.author == "Test Author"
@@ -156,10 +159,11 @@ def test_convert_epub_no_errors_in_report(
 
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path)
-    report = convert_epub(simple_epub3_path, tmp_path, settings, FakeTTSEngine())
+    report = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(FakeTTSEngine()))
 
     assert report.errors == [], f"Expected no errors in report, got: {report.errors}"
 
@@ -175,10 +179,11 @@ def test_convert_epub_chapter_duration_positive(
 
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path)
-    report = convert_epub(simple_epub3_path, tmp_path, settings, FakeTTSEngine())
+    report = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(FakeTTSEngine()))
 
     for result in report.chapter_results:
         assert result.duration_seconds > 0, (

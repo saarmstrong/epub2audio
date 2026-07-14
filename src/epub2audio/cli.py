@@ -172,7 +172,10 @@ def convert(
     output_format: str = typer.Option(
         "mp3",
         "--format",
-        help="Output format: 'mp3' (one file per chapter) or 'm4b' (single audiobook).",
+        help=(
+            "Output format: 'mp3' (one file per chapter), 'm4b' (single "
+            "audiobook), or 'both' (per-chapter MP3s and a single M4B in one run)."
+        ),
     ),
     bitrate: str = typer.Option("96k", "--bitrate", help="Audio bitrate, e.g. '96k'."),
     sample_rate: int = typer.Option(24000, "--sample-rate", help="Output sample rate in Hz."),
@@ -194,6 +197,11 @@ def convert(
         None, "--chapter-end", help="Last chapter number to convert (1-based, inclusive)."
     ),
     config: Path | None = typer.Option(None, "--config", help="Path to TOML configuration file."),
+    validate: bool = typer.Option(
+        False,
+        "--validate",
+        help="Run post-conversion quality checks and write validation-report.json.",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose logging."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output."),
 ) -> None:
@@ -201,8 +209,9 @@ def convert(
 
     With ``--format mp3`` (default) produces one MP3 file per logical chapter
     in reading order, named ``NNN - Chapter Title.mp3``.  With ``--format m4b``
-    produces a single ``.m4b`` audiobook with embedded chapter markers.
-    Output is written to *output*.
+    produces a single ``.m4b`` audiobook with embedded chapter markers.  With
+    ``--format both`` produces per-chapter MP3s AND a single ``.m4b`` in one
+    synthesis pass.  Output is written to *output*.
 
     TTS engine selection: uses Kokoro if available, otherwise falls back to
     the built-in ``FakeTTSEngine`` (silent audio, useful for testing the
@@ -238,9 +247,10 @@ def convert(
     # Build settings                                                       #
     # ------------------------------------------------------------------ #
     fmt = output_format.strip().lower()
-    if fmt not in ("mp3", "m4b"):
+    if fmt not in ("mp3", "m4b", "both"):
         _err_console.print(
-            f"[red]Error:[/red] invalid --format {output_format!r} (expected 'mp3' or 'm4b')."
+            f"[red]Error:[/red] invalid --format {output_format!r} "
+            "(expected 'mp3', 'm4b', or 'both')."
         )
         raise typer.Exit(code=1)
 
@@ -292,24 +302,23 @@ def convert(
         return
 
     # ------------------------------------------------------------------ #
-    # TTS engine selection                                                 #
+    # Provider selection                                                   #
     # ------------------------------------------------------------------ #
-    from epub2audio.tts.base import TTSEngine
+    from epub2audio.providers.base import NarrationProvider
+    from epub2audio.providers.kokoro import KokoroProvider, build_kokoro_provider
 
-    tts_engine: TTSEngine
+    provider: NarrationProvider
     try:
-        from epub2audio.tts.kokoro import KokoroTTSEngine
         from epub2audio.tts.voices import get_lang_code
 
-        # Get the lang_code for the configured language
         lang_code = get_lang_code(settings.language)
-        tts_engine = KokoroTTSEngine(lang_code=lang_code)
+        provider = build_kokoro_provider(lang_code)
         if not quiet:
             _console.print("[green]Using Kokoro TTS engine.[/green]")
     except Exception as exc:
         from epub2audio.tts.fake import FakeTTSEngine
 
-        tts_engine = FakeTTSEngine()
+        provider = KokoroProvider(FakeTTSEngine())
         if not quiet:
             _console.print(
                 f"[yellow]Kokoro not available ({type(exc).__name__}: {exc}) — "
@@ -333,7 +342,7 @@ def convert(
             epub_path=epub_path,
             output_dir=output,
             settings=settings,
-            tts_engine=tts_engine,
+            provider=provider,
             plan=filtered_plan,
         )
     except MissingDependencyError as exc:
@@ -357,6 +366,21 @@ def convert(
                 )
             else:
                 _console.print("\n[red]M4B assembly did not produce an output file.[/red]")
+        elif settings.output_format == "both":
+            successful = sum(1 for r in report.chapter_results if r.output_path is not None)
+            failed = len(report.chapter_results) - successful
+            _console.print(
+                f"\n[green]Done.[/green] {successful} MP3 chapter(s) converted"
+                + (f", [red]{failed} failed[/red]" if failed else "")
+                + "."
+            )
+            if report.output_path is not None:
+                _console.print(
+                    f"[green]M4B:[/green] [bold]{report.output_path}[/bold] "
+                    f"({len(report.chapter_markers)} chapter(s))."
+                )
+            else:
+                _console.print("[red]M4B assembly did not produce an output file.[/red]")
         else:
             successful = sum(1 for r in report.chapter_results if r.output_path is not None)
             failed = len(report.chapter_results) - successful
@@ -368,6 +392,44 @@ def convert(
         if report.errors:
             for err in report.errors:
                 _err_console.print(f"[red]Error:[/red] {err}")
+
+    # ------------------------------------------------------------------ #
+    # Optional validation stage (--validate)                               #
+    # ------------------------------------------------------------------ #
+    if validate:
+        from epub2audio.utils.files import atomic_write
+        from epub2audio.validation import validate_conversion
+
+        validation = validate_conversion(report, filtered_plan, settings, output)
+
+        # Write validation-report.json atomically alongside conversion-report.json.
+        validation_report_path = output / "validation-report.json"
+        atomic_write(
+            validation_report_path,
+            validation.model_dump_json(indent=2).encode("utf-8"),
+        )
+
+        if not quiet:
+            status_colour = "green" if validation.ok else "red"
+            status_label = "PASSED" if validation.ok else "FAILED"
+            _console.print(
+                f"\n[{status_colour}]Validation {status_label}[/{status_colour}] "
+                f"— {validation.error_count} error(s), "
+                f"{validation.warning_count} warning(s), "
+                f"{validation.info_count} info."
+            )
+            if validation.issues:
+                for issue in validation.issues:
+                    if issue.severity == "error":
+                        _err_console.print(f"  [red]\u2717 [{issue.code}][/red] {issue.message}")
+                    elif issue.severity == "warning":
+                        _console.print(f"  [yellow]\u26a0 [{issue.code}][/yellow] {issue.message}")
+                    else:
+                        _console.print(f"  [dim][{issue.code}][/dim] {issue.message}")
+            _console.print(f"[dim]Validation report written to {validation_report_path}[/dim]")
+        # Exit-code policy: validation failures print clearly but do not change
+        # the process exit code in M11.  A future milestone may add --fail-on-validation
+        # to gate CI on validation outcome without changing the default behaviour.
 
 
 @app.command()

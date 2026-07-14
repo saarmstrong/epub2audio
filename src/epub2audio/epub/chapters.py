@@ -67,6 +67,73 @@ _FRONT_BACK_MATTER_KEYWORDS: frozenset[str] = frozenset(
     }
 )
 
+# Titles that are, by convention, non-narrative front/back matter and should
+# never be read aloud.  A match forces a hard exclusion regardless of any other
+# positive signal (e.g. a TOC entry), because these pages are consistently NOT
+# part of the narration.  Deliberately conservative: creative pages that are
+# sometimes narrated (dedication, epigraph, prologue, preface, foreword,
+# introduction) are NOT listed here.
+_FRONT_MATTER_HARD_TITLES: frozenset[str] = frozenset(
+    {
+        "copyright",
+        "contents",
+        "table of contents",
+        "acknowledgement",
+        "acknowledgements",
+        "acknowledgment",
+        "acknowledgments",
+        "colophon",
+        "index",
+        "cover",
+        "title page",
+        "half title",
+        "half-title",
+        "about the author",
+        "about the publisher",
+        "newsletter",
+        "also by the author",
+    }
+)
+
+# Title *prefixes* that mark non-narrative front/back matter, e.g. an "Also by
+# William Gibson" / "Titles by …" page listing the author's other works, or a
+# "Praise for …" blurbs page.  Matched against the lower-cased, stripped title.
+_FRONT_MATTER_TITLE_PREFIXES: tuple[str, ...] = (
+    "also by ",
+    "titles by ",
+    "books by ",
+    "other books by ",
+    "other titles by ",
+    "by the same author",
+    "praise for ",
+    "more praise for ",
+    "about the author",
+)
+
+
+def _is_hard_front_matter_title(title: str | None) -> bool:
+    """Return True when *title* is a non-narrative front/back-matter page.
+
+    Used to hard-exclude pages such as "Copyright", "Contents", or an "Also by
+    …" author bibliography, which should never be narrated even when they
+    appear in the table of contents.  Matching is case-insensitive on the
+    stripped title: an exact match against :data:`_FRONT_MATTER_HARD_TITLES`
+    or a prefix match against :data:`_FRONT_MATTER_TITLE_PREFIXES`.
+
+    Args:
+        title: The candidate title, or ``None``.
+
+    Returns:
+        True when the title is definitively non-narrative front/back matter.
+    """
+    if not title:
+        return False
+    t = title.strip().lower()
+    if t in _FRONT_MATTER_HARD_TITLES:
+        return True
+    return any(t.startswith(prefix) for prefix in _FRONT_MATTER_TITLE_PREFIXES)
+
+
 # epub:type values that receive a strong exclusion penalty (-5) because they
 # are structural front-matter pages that can never be chapters.
 _STRONG_EXCLUSION_EPUB_TYPES: frozenset[str] = frozenset(
@@ -361,8 +428,14 @@ def score_candidates(
         if title is None:
             title = _guess_title_from_content(content)
 
-        # Title-based front/back-matter keyword check
-        if title:
+        # Hard front/back-matter title check: definitive non-narrative pages
+        # (Copyright, Contents, "Also by …", etc.) are excluded outright so a
+        # TOC entry cannot pull them back in.  This overrides all other signals.
+        if title and _is_hard_front_matter_title(title):
+            score = -10
+            signals = [f"front_matter_title({title.strip().lower()!r}) -10"]
+        # Softer title-based front/back-matter keyword check for ambiguous pages.
+        elif title:
             title_lower = title.strip().lower()
             if title_lower in _FRONT_BACK_MATTER_KEYWORDS:
                 score -= 3

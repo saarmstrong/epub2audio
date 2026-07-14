@@ -34,10 +34,11 @@ def test_convert_epub_produces_single_m4b(
     from epub2audio.audio.validate import validate_audio
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path, output_format="m4b")
-    report = convert_epub(simple_epub3_path, tmp_path, settings, FakeTTSEngine())
+    report = convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(FakeTTSEngine()))
 
     # 1. One .m4b, no per-chapter .mp3
     m4b_files = sorted(tmp_path.glob("*.m4b"))
@@ -80,9 +81,10 @@ def test_m4b_run_leaves_no_work_dir(
 
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path, output_format="m4b")
-    convert_epub(simple_epub3_path, tmp_path, settings, FakeTTSEngine())
+    convert_epub(simple_epub3_path, tmp_path, settings, KokoroProvider(FakeTTSEngine()))
 
     assert not (tmp_path / ".epub2audio-work").exists()

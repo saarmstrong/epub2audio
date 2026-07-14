@@ -12,3 +12,6 @@ __pycache__/
 
 # OS cruft
 .DS_Store
+
+# Subagent run artifacts
+.pi-subagents/

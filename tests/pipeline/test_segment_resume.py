@@ -209,11 +209,12 @@ def test_convert_epub_creates_persistent_work_dir(
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
     from epub2audio.pipeline.manifest import read_manifest
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path)
-    engine = FakeTTSEngine()
-    report = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    provider = KokoroProvider(FakeTTSEngine())
+    report = convert_epub(simple_epub3_path, tmp_path, settings, provider)
 
     # Conversion should succeed
     assert report.errors == []
@@ -239,11 +240,12 @@ def test_convert_epub_keep_intermediates_preserves_work_dir(
 
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path, keep_intermediates=True)
-    engine = FakeTTSEngine()
-    report = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    provider = KokoroProvider(FakeTTSEngine())
+    report = convert_epub(simple_epub3_path, tmp_path, settings, provider)
 
     assert report.errors == []
 
@@ -269,12 +271,13 @@ def test_convert_epub_segments_have_audio_path_set(
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
     from epub2audio.pipeline.manifest import read_manifest
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     # Use keep_intermediates to ensure work dir and segment paths remain valid
     settings = Settings(output_dir=tmp_path, keep_intermediates=True)
-    engine = FakeTTSEngine()
-    convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    provider = KokoroProvider(FakeTTSEngine())
+    convert_epub(simple_epub3_path, tmp_path, settings, provider)
 
     manifest = read_manifest(tmp_path / "manifest.json")
     assert len(manifest.segments) > 0
@@ -302,18 +305,19 @@ def test_resume_skips_cached_segments(
 
     from epub2audio.config import Settings
     from epub2audio.pipeline.converter import convert_epub
+    from epub2audio.providers.kokoro import KokoroProvider
     from epub2audio.tts.fake import FakeTTSEngine
 
     settings = Settings(output_dir=tmp_path, keep_intermediates=True, resume=True)
-    engine = FakeTTSEngine()
+    provider = KokoroProvider(FakeTTSEngine())
 
     # First run — synthesize everything
-    report1 = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+    report1 = convert_epub(simple_epub3_path, tmp_path, settings, provider)
     assert report1.errors == []
 
     # Second run — should reuse cached WAVs
     with caplog.at_level(logging.INFO, logger="epub2audio.pipeline.converter"):
-        report2 = convert_epub(simple_epub3_path, tmp_path, settings, engine)
+        report2 = convert_epub(simple_epub3_path, tmp_path, settings, provider)
 
     assert report2.errors == []
     assert "resumed from cached WAV" in caplog.text, (

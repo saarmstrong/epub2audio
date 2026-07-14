@@ -1,0 +1,79 @@
+# Bundled default pronunciation dictionary for epub2audio.
+#
+# Loaded automatically for every conversion (disable with
+# `use_default_pronunciations = false`).  Any term you define in your own
+# `pronunciation_dictionary` OVERRIDES the default of the same name, so you can
+# tune or remove any entry below without editing this file.
+#
+# Matching is CASE-SENSITIVE and whole-token, so "Mr" and "mr" are distinct and
+# a term never matches inside a larger word.  Values are phonetic *respellings*
+# (what a grapheme-based engine such as Kokoro reads); add `ipa:` too if you use
+# an SSML-capable provider later.
+#
+# IMPORTANT: these are context-FREE substitutions.  Only include words with a
+# single, unambiguous correct pronunciation.  Context-dependent homographs
+# (read/lead/live/wind/tear/bow/close…) are intentionally NOT listed, because a
+# blind respelling would be wrong half the time.  The same caveat applies to
+# function words like "the" (which is "thee" before a vowel, "thuh" otherwise) —
+# see the commented section at the bottom.
+
+pronunciations:
+  # --- Titles / honorific abbreviations (read as full words in prose) --------
+  Mr: "Mister"
+  Mrs: "Missus"
+  Ms: "Mizz"
+  Mmes: "Mesdames"
+  Dr: "Doctor"
+  Drs: "Doctors"
+  Prof: "Professor"
+  Mt: "Mount"
+  Ft: "Fort"
+  Sgt: "Sergeant"
+  Capt: "Captain"
+  Lt: "Lieutenant"
+  Gen: "General"
+  Rev: "Reverend"
+  Hon: "Honorable"
+
+  # --- Common Latin / shorthand abbreviations --------------------------------
+  vs: "versus"
+  etc: "et cetera"
+  "e.g": "for example"
+  "i.e": "that is"
+  approx: "approximately"
+
+  # --- Loanwords & classically mispronounced words (single correct reading) --
+  facade: "fuh-SODD"
+  façade: "fuh-SODD"
+  niche: "neesh"
+  genre: "ZHAHN-ruh"
+  colonel: "KER-nel"
+  epitome: "ih-PIT-oh-mee"
+  hyperbole: "hy-PER-buh-lee"
+  segue: "SEG-way"
+  cache: "cash"
+  macabre: "muh-KAHB-ruh"
+  awry: "uh-RYE"
+  subtle: "SUT-ul"
+  quinoa: "KEEN-wah"
+  chic: "sheek"
+  debris: "duh-BREE"
+  rendezvous: "RON-day-voo"
+  liaison: "lee-AY-zon"
+  bourgeois: "boor-ZHWAH"
+  espresso: "eh-SPRESS-oh"
+  mischievous: "MIS-chiv-us"
+  gauge: "gayj"
+  draught: "draft"
+  quay: "kee"
+  hearth: "harth"
+  victuals: "VITT-ulz"
+  Worcestershire: "WUUS-ter-sher"
+
+  # --- Context-dependent examples (commented out on purpose) -----------------
+  # Uncomment only if your chosen voice consistently gets these wrong AND you
+  # accept that the substitution ignores context. "the" before a vowel should
+  # be "thee"; a global respelling cannot know the following word.
+  # the: "thuh"
+  # The: "Thuh"
+  # a: "uh"

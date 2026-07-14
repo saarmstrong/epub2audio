@@ -1,10 +1,12 @@
 """Shared fixtures for the pipeline test suite.
 
 Provides:
-- ``CountingFakeTTSEngine``  — FakeTTSEngine wrapper that records every
+- ``CountingFakeTTSEngine``          — FakeTTSEngine wrapper that records every
   ``synthesize()`` call so tests can assert how many segments were synthesized.
-- ``fake_tts_engine``        — standard FakeTTSEngine fixture.
-- ``fake_tts_engine_with_counter`` — CountingFakeTTSEngine fixture.
+- ``fake_tts_engine``                — standard FakeTTSEngine fixture.
+- ``fake_tts_engine_with_counter``   — CountingFakeTTSEngine fixture.
+- ``fake_provider``                  — KokoroProvider(FakeTTSEngine()) fixture.
+- ``fake_provider_with_counter``     — KokoroProvider(CountingFakeTTSEngine()) fixture.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from typing import Any
 import pytest
 
 from epub2audio.models import AudioChunk
+from epub2audio.providers.kokoro import KokoroProvider
 from epub2audio.tts.base import TTSEngine
 from epub2audio.tts.fake import FakeTTSEngine
 
@@ -92,3 +95,29 @@ def fake_tts_engine_with_counter() -> CountingFakeTTSEngine:
     the test function.
     """
     return CountingFakeTTSEngine()
+
+
+@pytest.fixture
+def fake_provider() -> KokoroProvider:
+    """A :class:`~epub2audio.providers.kokoro.KokoroProvider` backed by :class:`~epub2audio.tts.fake.FakeTTSEngine`.
+
+    Use this fixture when a test needs to call :func:`~epub2audio.pipeline.converter.convert_epub`
+    directly without a real Kokoro install.
+    """
+    return KokoroProvider(FakeTTSEngine())
+
+
+@pytest.fixture
+def fake_provider_with_counter() -> tuple[KokoroProvider, CountingFakeTTSEngine]:
+    """A :class:`~epub2audio.providers.kokoro.KokoroProvider` backed by a
+    :class:`CountingFakeTTSEngine`.  Returns ``(provider, engine)`` so tests
+    can inspect ``engine.call_count`` and ``engine.calls`` after calling
+    :func:`~epub2audio.pipeline.converter.convert_epub`.
+
+    For tests that need two independent counting providers (e.g. first run vs
+    second run), instantiate :class:`CountingFakeTTSEngine` and
+    :class:`~epub2audio.providers.kokoro.KokoroProvider` directly inside the
+    test function.
+    """
+    engine = CountingFakeTTSEngine()
+    return KokoroProvider(engine), engine

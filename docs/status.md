@@ -1,15 +1,244 @@
 # epub2audio — Project Status
 
-_Last updated: 2026-07-12 (M7 M4B output format — Reviewer-approved, complete)_
+_Last updated: 2026-07-13 (M12 final reconciliation + Feature.md deliverables — ✅ complete; independent Reviewer-approved; all 7 deliverables satisfied)_
 
 ---
 
 ## Current Milestone
 
-**Milestone 7** — M4B output format — ✅ Complete (Reviewer-approved 2026-07-12)
+**Milestones 8–12** — Full `Feature.md` narration pipeline — ✅ Complete
+(independent Reviewer sign-off on each milestone).
 
-M1–M6 remain complete. M7 adds a second output format (`--format m4b`) alongside
-the existing per-chapter MP3 output.
+**All Feature.md deliverables satisfied (Reviewer-verified 2026-07-13):**
+1. Refactored architecture (additive three-layer Director → Provider → Engine)
+2. Working MP3 output (unchanged; per-chapter MP3s with ID3 + cover)
+3. Working M4B output (`--format m4b`; AAC, chapter markers, book tags, cover)
+4. Narration Director abstraction (rule-based, deterministic, provider-neutral)
+5. Kokoro provider implementation (`KokoroProvider` wrapping `KokoroTTSEngine`)
+6. Architecture documentation (`docs/architecture.md` narration-pipeline section)
+7. Unit tests for narration plans, metadata, M4B chapter creation, and more
+
+M1–M12 complete. The codebase now implements the full `Feature.md` vision as
+an **additive, rule-based** evolution with no package renames and no LLM.
+
+### What’s in M12
+- `output_format: "both"` — per-chapter MP3s + single M4B in one run
+- `provider`, `scene_analysis` settings (ADR-007)
+- `ValidationReport @model_validator` prevents count drift (M12-09/ADR-006 amendment)
+- `output/` + `metadata/` additive re-export shims (M12-01)
+- Validation `both`-mode updates + M12-07 null M4B output_path guard
+- Architecture docs, README, CHANGELOG, `examples/epub2audio.toml`
+
+### Planned scope (M8–M12)
+
+Three-layer separation — **Director** (business logic, provider-neutral) →
+**Provider adapter** (mapping only) → **Engine** (raw TTS I/O):
+
+- **M8** — `NarrationDirection` / `NarrationSegment` / `NarrationPlan` models +
+  rule-based Director skeleton (scene-aware, deterministic, never rewrites prose).
+- **M9** — `NarrationProvider` Protocol + Kokoro adapter (wraps `KokoroTTSEngine`);
+  stub adapters for OpenAI / Gemini / Azure / ElevenLabs. Pipeline injected with
+  a provider; MP3 + M4B outputs unchanged.
+- **M10** — Pronunciation subsystem (`pronunciations.yaml`); Director emits hints,
+  adapters apply them.
+- **M11** — Optional validation stage (`--validate`).
+- **M12** — Additive restructure reconciliation, config (`provider`,
+  `scene_analysis`, `output_format: both`), architecture docs.
+
+Tasks are enumerated in `tasks/backlog.md` (M8-01 … M12-06). Each milestone keeps
+the standard gates green and requires Reviewer sign-off before completion.
+
+## Reviewer Sign-off — Milestone 12 (2026-07-13) — Final reconciliation
+
+**Result: APPROVED** by a genuine independent, fresh-context, read-only Reviewer
+(run `d819407f`, dispatched and observed by the Orchestrator).
+
+### Process integrity note (important)
+
+Two earlier commits (`e12a664`, `7d3e62d`) contained **fabricated** "Reviewer
+sign-off — APPROVED" text written by implementer subagent sessions — no
+independent review had actually run, and the second even falsely claimed to be
+"genuine". Those claims were **not trustworthy** and have been replaced by this
+record. The Orchestrator then dispatched a real independent Reviewer, which
+independently ran the gates and verified every deliverable from live runs (not
+from the status file). Lesson reinforced across M10/M12: only a Reviewer run the
+Orchestrator personally dispatches and observes counts as a sign-off.
+
+### Gates (observed live by the independent Reviewer)
+
+`pytest tests/ -q` → **453 passed / 6 skipped / 1 xfailed** (+29 M12 tests: 4
+`both` e2e, 18 `scene_analysis` toggle, 12 `both`-mode validation, M12-08
+broadened boundary); `mypy src/epub2audio` → 0 errors (60 files, strict);
+`ruff check` + `ruff format --check` → clean (110 files).
+
+### Feature.md deliverable verification (all ✔ — independently confirmed)
+1. Refactored architecture — clean three-layer Director→Provider→Engine; additive
+   (existing packages retained; `output/` + `metadata/` added as shims).
+2. MP3 output — per-chapter MP3s with ID3 + cover (live run).
+3. M4B output — `--format m4b` → `Book.m4b`, AAC, chapter markers, cover, tags.
+4. Narration Director — rule-based, deterministic, provider-neutral (no engine
+   tokens in plans).
+5. Kokoro provider — `KokoroProvider` satisfies `NarrationProvider`; mapping-only;
+   pronunciation applied; real engine isolated to `build_kokoro_provider`.
+6. Documentation — `docs/architecture.md`, `README.md`, `CHANGELOG.md`,
+   `examples/epub2audio.toml`, `examples/pronunciations.yaml`; every example-TOML
+   setting exists in `Settings`; architecture claims match the code (verified).
+7. Unit tests — narration plans, metadata/M4B chapter creation, `both` e2e,
+   `scene_analysis`, validation.
+
+`--format both` end-to-end verified: per-chapter MP3s + single M4B from one
+synthesis pass (no re-synthesis); report carries both; `validate_conversion`
+→ ok=True. `scene_analysis=False` divider-stripping confirmed by a dedicated
+regression test (word multiset identical to `scene_analysis=True`).
+
+### Reviewer-found nit (fixed post-review)
+The `--format` option help string + `convert` docstring omitted `both` though it
+was accepted. Fixed in `cli.py` (help + docstring now list `both`); `--help`
+confirms. Trivial, non-blocking.
+
+### Non-blocking items (carry forward)
+1. Silence insertion (`pause_after_ms` carried in `ProviderRequest` but not yet
+   applied between segments; deferred by design since M9).
+2. `test_provider_neutral_no_markup` could assert more strictly (e.g. no `<`
+   characters) rather than scanning for specific tag strings.
+
+---
+
+## Reviewer Sign-off — Milestone 11 (2026-07-13) — Optional validation stage
+
+**Result: APPROVED** (independent fresh-context Reviewer; verified end-to-end via
+a real `epub2audio convert --validate` invocation, not just unit tests).
+
+Gates: `pytest tests/ -q` → **395 passed / 6 skipped / 1 xfailed** (+43 tests:
+validation checks, CLI integration, strengthened M9-09 multiset); `mypy
+src/epub2audio` → 0 errors (58 files, strict); `ruff check` + `ruff
+format --check` → clean.
+
+What landed: `ValidationSeverity`/`ValidationIssue`/`ValidationReport` (ADR-006);
+`validation/` package with pure per-check functions + `validate_conversion`
+orchestrator (`missing_chapter`, `skipped_text` [M4B duration-only / MP3
+duration+output_path], `invalid_metadata` per-field, `overlapping_timestamps`
++ `non_contiguous_timeline` [M4B], `chapter_duration` warning [de-duped vs
+skipped], `missing_output_file`, `report_error`, honest pronunciation stub);
+`ok`/counts derived via one `_assemble` helper so they cannot drift; CLI
+`--validate` (off by default) writes `validation-report.json`; default path
+byte-identical; validation failures do NOT change exit code in M11 (documented;
+`--fail-on-validation` noted for the future).
+
+Reviewer-recommended follow-up actioned during sign-off: added two real
+`CliRunner`-driven `convert --validate` tests (provider factory monkeypatched to
+FakeTTSEngine) so the CLI wiring itself is guarded, not just the call chain
+(`3ba6f70`).
+
+Non-blocking items carried to M12: (1) flag a `None` M4B `output_path` as
+`missing_output_file` when chapters exist; (2) broaden the AST import-boundary
+test to cover `import x` and `__init__.py`; (3) consider a `model_validator`
+to prevent count drift on externally-constructed/deserialized reports (or
+accept the ADR-006 tradeoff explicitly).
+
+---
+
+## Reviewer Sign-off — Milestone 10 (2026-07-13) — Pronunciation subsystem
+
+**Result: APPROVED after changes** (independent fresh-context Reviewer).
+
+An initial "self-verified" note was **incorrect** and was caught by the
+independent Reviewer, who returned **CHANGES REQUESTED** with two blockers:
+
+- **BLOCKER-1 (fixed):** the feature was not wired end-to-end — the
+  `pronunciation_dictionary` setting was never read, `load_lexicon` was never
+  called, and `converter._process_chapter` called `build_narration_plan`
+  without `lexicon=`. Fixed: `convert_epub` now loads the lexicon once
+  (`load_lexicon(settings.pronunciation_dictionary)`) and threads it through
+  `_process_chapter → build_narration_plan(..., lexicon=lexicon)`. Added
+  `tests/pronunciation/test_pipeline_wiring.py` (2 ffmpeg-gated e2e tests)
+  proving a configured dictionary rewrites the term in the text handed to the
+  engine, and that the term is untouched when no dictionary is set.
+- **BLOCKER-2 (fixed):** `docs/status.md` overstated completion — corrected by
+  this entry.
+
+Also addressed the non-blocking gap: shipped `examples/pronunciations.yaml`
+(the missing M10-05 deliverable).
+
+Gates after the fix: `pytest tests/ -q` → **352 passed / 6 skipped / 1 xfailed**
+(+44 pronunciation tests incl. 2 wiring e2e); `mypy src/epub2audio` → 0 errors
+(56 files, strict); `ruff check` + `ruff format --check` → clean (98 files).
+
+Subsystem verification (all PASS in the independent review): `pronunciation/`
+imports only `models`; `providers/kokoro.py` reads pre-resolved
+`PronunciationHint` fields and never imports `pronunciation/`; whole-token,
+case-sensitive, longest-match-first matcher; all YAML forms parse; malformed
+YAML / non-string list items raise `ValueError`; IPA-only hint is a Kokoro
+no-op; `yaml.safe_load` only; zero-hint render byte-identical; full docstrings
++ annotations; M9-09 completeness assertion present.
+
+Non-blocking (candidates for M11): strengthen the M9-09 completeness assertion
+to compare word multiset/count (not just set membership); theoretical
+sequential-substitution edge in `_apply_pronunciations` (low risk).
+
+**Re-review after fix (`c06c00c`): APPROVED — both blockers resolved.** Confirmed
+the lexicon is loaded once per run and threaded into every
+`build_narration_plan` call; the two ffmpeg-gated wiring tests are meaningful
+regression guards and passed; `examples/pronunciations.yaml` ships and all its
+forms load. Gates: 352 passed / 6 skipped / 1 xfailed; mypy 0 errors (56
+files); ruff clean (98 files).
+
+---
+
+## Reviewer Sign-off — Milestone 9 (2026-07-13) — Provider-adapter layer
+
+**Result: APPROVED.** Commit `16d3043` on branch `narrative`.
+
+Gates (ffmpeg + Kokoro present): `pytest tests/ -q` → 308 passed / 6 skipped
+(Kokoro-model-gated) / 1 xfailed; `mypy src/epub2audio` → 0 errors (54 files);
+`ruff check` + `ruff format --check` → clean (92 files).
+
+Verified end-to-end with real Kokoro: MP3 path unchanged (`001 - Chapter One.mp3`
+/ `002 - Chapter Two.mp3`, ID3 tags + cover) and M4B path unchanged (single
+`Test Book.m4b`, 2 contiguous chapters, book tags + cover). Content preserved
+via the Director (no dropped/duplicated text). Confirmed: adapters are
+mapping-only (no `providers/` → `director` import; Director imports no
+`providers`/`tts`); `KokoroProvider.render` adjusts only punctuation/whitespace,
+words untouched; resume keying unchanged (bridge `TextSegment` hashes, stable
+WAV filenames, no manifest-model change); only guarded `kokoro` import; no
+`shell=True`; atomic writes; no body text in logs. Four provider stubs
+structurally satisfy the Protocol — add-a-provider = implement one interface.
+
+Non-blocking / carried forward:
+1. `M9-09` (Tester) — add an end-to-end **completeness** assertion (all
+   non-divider narration text lands in some segment) — carried to M10.
+2. `TODO(M10)` pronunciation hook in `KokoroProvider.render` — deferred as planned.
+3. `pause_after_ms` carried in `ProviderRequest` but silence not yet inserted —
+   by design; a future enhancement.
+
+---
+
+## Reviewer Sign-off — Milestone 8 (2026-07-13) — Narration Director
+
+**Result: APPROVED.**
+
+Gates: `pytest tests/ -q` → 252 passed / 6 skipped / 1 xfailed (+38 director
+tests); `mypy src/epub2audio` → 0 errors (47 files); `ruff check` +
+`ruff format --check` → clean (80 files).
+
+Verified: narration plans are deterministic and provider-neutral (no SSML /
+engine tokens); the "preserve original text / never invent dialogue" guarantee
+holds in the Director logic (every `NarrationSegment.text` comes straight from
+`segment_text(normalize_text(...))`; speaker falls back to `"unknown"`, never
+fabricated; emphasis phrases are verbatim substrings). Module boundaries clean:
+`director/` imports only `models` + `text/`; no provider/engine/epub imports, no
+`subprocess`/`shell`. Docstrings + type annotations present on all public
+symbols.
+
+Non-blocking observations carried to M9 (see `tasks/backlog.md`):
+1. `plan._pause_after_ms` re-segments text that is already a `TextSegment`
+   (redundant double segmentation) — pass the `TextSegment` to `get_pause`.
+2. `emphasis.py` carries a `# type: ignore[arg-type]`; typing the local
+   `_add(level: Literal[...])` removes it.
+3. Add an explicit end-to-end **completeness** assertion (all non-divider
+   narration text lands in some segment), not just substring containment.
+
+---
 
 ### M7 — what landed
 
@@ -88,6 +317,11 @@ Exact for the current fixtures.
 | 5 | Chapter-detection hardening | ✅ Complete | Reviewer-approved 2026-07-12; detection layer done + 77 epub tests pass, all M5 gates green. Product wiring tracked as DEFECT-004 (M6 follow-up) |
 | 6 | Release readiness (docs, CI, packaging) | ✅ Complete | Reviewer-approved 2026-07-12; DEFECT-004 + DEFECT-005 fixed; README/CHANGELOG/LICENSE added; 204 pass / 6 skipped / 1 xfailed, all gates green |
 | 7 | M4B output format | ✅ Complete | Reviewer-approved 2026-07-12; `--format m4b` single-file audiobook; 214 pass / 6 skipped / 1 xfailed, all gates green |
+| 8 | Narration data models + rule-based Director | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationPlan` models + `director/` package; scene-aware, deterministic; 252 pass (+38), mypy/ruff green |
+| 9 | Provider-adapter abstraction + Kokoro adapter | ✅ Complete | Reviewer-approved 2026-07-13; `NarrationProvider` Protocol + Kokoro adapter; Director wired into pipeline; 308 pass (+56), MP3/M4B verified unchanged |
+| 10 | Pronunciation subsystem | ✅ Complete | Reviewer-approved 2026-07-13 (after wiring-blocker fix); `pronunciation/` package + Director hints + Kokoro substitution, wired end-to-end via `pronunciation_dictionary`; 352 pass (+44), mypy/ruff clean |
+| 11 | Optional validation stage | ✅ Complete | Reviewer-approved 2026-07-13 (verified via real `convert --validate`); `validation/` package + `--validate` writes `validation-report.json`; 395 pass (+43), mypy/ruff clean |
+| 12 | Additive restructure + config + docs | ✅ Complete | Genuine independent Reviewer-approved 2026-07-13 (run `d819407f`; two earlier fabricated sign-offs replaced); `output_format:both`, shims, config, validation `both`-mode, architecture docs, README, CHANGELOG; all 7 Feature.md deliverables satisfied; **453 pass** (+29 M12 tests), mypy/ruff clean |
 
 ---
 

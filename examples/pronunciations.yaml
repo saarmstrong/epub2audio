@@ -1,0 +1,36 @@
+# Example pronunciation dictionary for epub2audio.
+#
+# Point the tool at this file with either:
+#   epub2audio convert book.epub -o out/ --config epub2audio.toml
+# where epub2audio.toml sets:
+#   pronunciation_dictionary = "examples/pronunciations.yaml"
+# or set EPUB2AUDIO_PRONUNCIATION_DICTIONARY=examples/pronunciations.yaml
+#
+# The Narration Director matches each `term` as a whole, case-sensitive token
+# in the narration text and records a provider-neutral pronunciation hint.
+# Grapheme-based engines (e.g. Kokoro) consume the `respelling`; SSML-capable
+# engines (e.g. Azure) can use the `ipa`.  A term with neither is simply
+# flagged (useful for future providers) but changes nothing for Kokoro.
+#
+# Four value forms are supported under `pronunciations:`
+#   1. a mapping with `ipa` and/or `respelling`
+#   2. a bare string  -> treated as the `respelling`
+#   3. null/empty     -> flags the term with no replacement
+#   4. (top-level)     a plain list of bare terms is also accepted
+
+pronunciations:
+  # Full form: both IPA (for SSML engines) and a plain respelling (for Kokoro).
+  Ono-Sendai:
+    ipa: "ˈoʊnoʊ sɛnˈdaɪ"
+    respelling: "Oh-no Sen-DYE"
+
+  Tessier-Ashpool:
+    respelling: "Tess-ee-AY Ash-pool"
+
+  # Shorthand: a bare string is used as the respelling.
+  Hosaka: "Ho-SAH-kah"
+
+  Neuromancer: "NEW-roh-man-ser"
+
+  # Flagged only (no replacement) — a no-op for Kokoro today.
+  Chiba: null

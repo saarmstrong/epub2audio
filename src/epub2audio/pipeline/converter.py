@@ -1,13 +1,18 @@
 """Full pipeline orchestration for epub2audio.
 
-:func:`convert_epub` is the central function of Milestone 2.  It drives the
-complete EPUB → MP3 conversion for every chapter in reading order, handling
-resume, per-segment TTS synthesis, WAV assembly, loudness normalization,
-MP3 encoding, metadata embedding, validation, and intermediate file cleanup.
+:func:`convert_epub` is the central function of the conversion pipeline.  It
+drives the complete EPUB → MP3/M4B conversion for every chapter in reading
+order, handling resume, per-segment synthesis via the Narration Director +
+provider adapter, WAV assembly, loudness normalization, encoding, metadata
+embedding, validation, and intermediate file cleanup.
 
 Design constraints:
-- ``TTSEngine`` is injected — this module never imports ``KokoroTTSEngine``
-  or ``FakeTTSEngine`` directly.
+- A :class:`~epub2audio.providers.base.NarrationProvider` is injected — this
+  module never imports a concrete provider or TTS engine.
+- The Narration Director (:func:`~epub2audio.director.build_narration_plan`)
+  produces provider-neutral :class:`~epub2audio.models.NarrationPlan` objects;
+  the provider adapter translates each segment into a
+  :class:`~epub2audio.providers.base.ProviderRequest` and synthesizes audio.
 - Chapters are processed one at a time; the full audiobook is never held in
   memory simultaneously.
 - All FFmpeg calls go through ``audio/`` helpers which enforce argument arrays
@@ -17,6 +22,12 @@ Design constraints:
 - Segment WAVs are written to a *persistent* work directory
   (``<output_dir>/.epub2audio-work/<chapter_id>/``) so they survive across
   runs and can be reused on resume.
+- Resume keying uses the same ``normalized_hash`` scheme as before
+  (SHA-256 of ``normalize_text(segment.text)``), so existing cached segment
+  WAVs remain valid across the M9 upgrade.
+- Inter-segment silence (``pause_after_ms``) is carried in the
+  :class:`~epub2audio.providers.base.ProviderRequest` but **not inserted** in
+  this milestone (reserved for a future milestone).
 """
 
 from __future__ import annotations
@@ -36,17 +47,20 @@ from epub2audio.audio.mux_m4b import build_m4b
 from epub2audio.audio.normalize import normalize_loudness
 from epub2audio.audio.validate import probe_duration, validate_audio, validate_mp3
 from epub2audio.config import Settings
+from epub2audio.director import build_narration_plan
 from epub2audio.epub.cleanup import xhtml_to_text
 from epub2audio.epub.cover import extract_cover
 from epub2audio.epub.reader import open_epub
 from epub2audio.models import (
-    AudioChunk,
     Chapter,
     ChapterMarker,
     ChapterResult,
     ConversionManifest,
     ConversionPlan,
     ConversionReport,
+    NarrationDirection,
+    NarrationPlan,
+    NarrationSegment,
     TextSegment,
 )
 from epub2audio.pipeline.manifest import (
@@ -61,9 +75,9 @@ from epub2audio.pipeline.resume import (
     segment_needs_synthesis,
     tts_config_changed,
 )
+from epub2audio.pronunciation import PronunciationLexicon, build_lexicon
+from epub2audio.providers.base import NarrationProvider
 from epub2audio.text.normalize import normalize_text
-from epub2audio.text.segment import segment_text
-from epub2audio.tts.base import TTSEngine
 from epub2audio.utils.names import sanitize_book_filename, sanitize_filename
 
 log = logging.getLogger(__name__)
@@ -161,44 +175,46 @@ def _load_chapter_text(
     return "\n\n".join(texts)
 
 
-def _build_segments(text: str, settings: Settings) -> list[TextSegment]:
-    """Normalize *text* and produce a list of :class:`TextSegment` objects.
+def _plan_to_resume_segment(nseg: NarrationSegment) -> tuple[str, str, int]:
+    """Derive the resume-key triple for a narration segment.
+
+    Returns ``(source_hash, normalized_hash, word_count)`` using the same
+    hashing scheme as the pre-M9 ``TextSegment`` model, so cached WAVs written
+    by earlier pipeline versions remain valid across the upgrade.
 
     Args:
-        text: Raw plain text from EPUB cleanup.
-        settings: Effective settings (currently unused for segmentation tuning
-            but included for forward compatibility).
+        nseg: A narration segment from the Director plan.
 
     Returns:
-        Ordered list of :class:`TextSegment` objects.
+        A ``(source_hash, normalized_hash, word_count)`` triple.
     """
-    _ = settings  # reserved for future max_chars / segment tuning config
-    normalized = normalize_text(text)
-    return segment_text(normalized)
+    source_hash = _text_hash(nseg.text)
+    normalized_hash = _text_hash(normalize_text(nseg.text))
+    word_count = len(nseg.text.split())
+    return source_hash, normalized_hash, word_count
 
 
-def _synthesize_segment(
-    segment: TextSegment,
-    tts_engine: TTSEngine,
-    settings: Settings,
-    seg_wav_path: Path,
-) -> None:
-    """Synthesize *segment* and write WAV output to *seg_wav_path*.
+def _flatten_plan(
+    plans: list[NarrationPlan],
+) -> list[tuple[NarrationDirection, NarrationSegment]]:
+    """Flatten a list of NarrationPlans into an ordered (default, segment) pair list.
+
+    Preserves scene/segment reading order and pairs each segment with its
+    scene-level default direction so the provider adapter can resolve the
+    effective direction without re-looking up the plan.
 
     Args:
-        segment: The segment to synthesize.
-        tts_engine: Injected TTS engine.
-        settings: Effective settings (voice, language, speed).
-        seg_wav_path: Destination WAV path for this segment.
+        plans: Ordered list of :class:`~epub2audio.models.NarrationPlan` for
+            a chapter.
+
+    Returns:
+        A flat list of ``(default_direction, narration_segment)`` pairs.
     """
-    chunks: list[AudioChunk] = tts_engine.synthesize(
-        segment.text,
-        voice=settings.voice,
-        language=settings.language,
-        speed=settings.speed,
-    )
-    combined = concat_chunks(chunks)
-    save_chunk(combined, seg_wav_path)
+    result: list[tuple[NarrationDirection, NarrationSegment]] = []
+    for plan in plans:
+        for seg in plan.segments:
+            result.append((plan.default_direction, seg))
+    return result
 
 
 def _process_chapter(
@@ -209,15 +225,17 @@ def _process_chapter(
     output_dir: Path,
     work_root: Path,
     settings: Settings,
-    tts_engine: TTSEngine,
+    provider: NarrationProvider,
+    lexicon: PronunciationLexicon,
     manifest: ConversionManifest,
     cover_bytes: bytes | None,
 ) -> tuple[ChapterResult, list[TextSegment]]:
-    """Convert a single chapter to a final MP3.
+    """Convert a single chapter to a final MP3 or per-chapter AAC (for M4B).
 
-    Handles resume (skip already-synthesized segments), WAV concatenation,
-    loudness normalization, MP3 encoding, metadata embedding, validation, and
-    intermediate file cleanup.
+    Drives the Director → provider-adapter synthesis loop, with resume
+    (skip already-synthesized segments), WAV concatenation, loudness
+    normalization, encoding, metadata embedding, validation, and intermediate
+    file cleanup.
 
     Args:
         chapter: The chapter to process.
@@ -227,7 +245,9 @@ def _process_chapter(
         output_dir: Final output directory for MP3s.
         work_root: Persistent root work directory (``.epub2audio-work/``).
         settings: Effective settings.
-        tts_engine: Injected TTS engine.
+        provider: Injected :class:`~epub2audio.providers.base.NarrationProvider`.
+        lexicon: Pronunciation lexicon (empty when no dictionary is configured)
+            passed to the Director so it can emit pronunciation hints.
         manifest: Current manifest (used for segment resume checking).
         cover_bytes: Optional cover art bytes to embed.
 
@@ -240,7 +260,7 @@ def _process_chapter(
     warnings: list[str] = []
 
     # ------------------------------------------------------------------ #
-    # Text extraction and segmentation                                     #
+    # Text extraction → Director plan                                      #
     # ------------------------------------------------------------------ #
     raw_text = _load_chapter_text(epub_path, chapter)
     if not raw_text.strip():
@@ -255,14 +275,21 @@ def _process_chapter(
             [],
         )
 
-    segments = _build_segments(raw_text, settings)
-    if not segments:
+    plans = build_narration_plan(
+        raw_text,
+        chapter_index,
+        lexicon=lexicon,
+        scene_analysis=settings.scene_analysis,
+    )
+    flat_segments = _flatten_plan(plans)
+
+    if not flat_segments:
         log.warning("Chapter %r produced no segments — skipping.", chapter.chapter_id)
         return (
             ChapterResult(
                 chapter_id=chapter.chapter_id,
                 duration_seconds=0.0,
-                warnings=["Chapter produced no segments after segmentation — skipped."],
+                warnings=["Chapter produced no segments after planning — skipped."],
                 output_path=None,
             ),
             [],
@@ -274,12 +301,15 @@ def _process_chapter(
     seg_wav_paths: list[Path] = []
     completed_segments: list[TextSegment] = []
 
-    for seg_idx, segment in enumerate(segments):
+    for seg_idx, (default_direction, nseg) in enumerate(flat_segments):
         seg_wav = chapter_work / f"seg_{seg_idx:04d}.wav"
 
+        # Derive resume key using the same normalized_hash scheme as before
+        # so cached WAVs from earlier runs (pre-M9) are still recognized.
+        source_hash, normalized_hash, word_count = _plan_to_resume_segment(nseg)
+
         # Resume: check if this segment's WAV already exists and is valid.
-        # Match by normalized_hash against the manifest's segment list.
-        existing_seg = _find_manifest_segment(manifest, segment.normalized_hash)
+        existing_seg = _find_manifest_segment(manifest, normalized_hash)
         if existing_seg is not None and not segment_needs_synthesis(existing_seg, output_dir):
             existing_path = Path(existing_seg.audio_path)  # type: ignore[arg-type]
             log.info(
@@ -295,18 +325,22 @@ def _process_chapter(
             "Chapter %r segment %d: synthesizing %d words",
             chapter.chapter_id,
             seg_idx,
-            segment.word_count,
+            word_count,
         )
-        _synthesize_segment(segment, tts_engine, settings, seg_wav)
-        seg_wav_paths.append(seg_wav)
 
-        # Record the completed segment with its audio_path set
+        # Director → provider adapter → synthesis
+        request = provider.render(nseg, default_direction, settings)
+        chunks = provider.synthesize(request)
+        combined = concat_chunks(chunks)
+        save_chunk(combined, seg_wav)
+
+        seg_wav_paths.append(seg_wav)
         completed_segments.append(
             TextSegment(
-                text=segment.text,
-                source_hash=segment.source_hash,
-                normalized_hash=segment.normalized_hash,
-                word_count=segment.word_count,
+                text=nseg.text,
+                source_hash=source_hash,
+                normalized_hash=normalized_hash,
+                word_count=word_count,
                 status="done",
                 audio_path=str(seg_wav.resolve()),
             )
@@ -324,7 +358,7 @@ def _process_chapter(
         )
 
     # ------------------------------------------------------------------ #
-    # WAV concatenation → normalization → MP3 encoding                    #
+    # WAV concatenation → normalization → encoding                         #
     # ------------------------------------------------------------------ #
     chapter_wav = chapter_work / "chapter.wav"
     chapter_wav_norm = chapter_work / "chapter_norm.wav"
@@ -338,37 +372,49 @@ def _process_chapter(
     else:
         encode_src = chapter_wav
 
-    if settings.output_format == "m4b":
-        # Per-chapter AAC segment persisted in the work dir; the single .m4b is
-        # muxed after all chapters succeed.  No per-chapter metadata here.
-        produced_path = chapter_work / "chapter.m4a"
+    needs_mp3 = settings.output_format in ("mp3", "both")
+    needs_m4b = settings.output_format in ("m4b", "both")
+
+    mp3_path: Path | None = None
+    aac_path: Path | None = None
+
+    if needs_mp3:
+        output_filename = sanitize_filename(chapter.title, chapter_index)
+        mp3_path = output_dir / output_filename
+        encode_mp3(
+            encode_src,
+            mp3_path,
+            bitrate=settings.bitrate,
+            sample_rate=settings.sample_rate,
+        )
+        validate_mp3(mp3_path, expected_sample_rate=settings.sample_rate)
+
+    if needs_m4b:
+        # Per-chapter AAC persisted in the work dir; the single .m4b is muxed
+        # after all chapters succeed.  The deterministic path is consumed by
+        # the M4B assembly block in convert_epub.
+        aac_path = chapter_work / "chapter.m4a"
         encode_aac(
             encode_src,
-            produced_path,
+            aac_path,
             bitrate=settings.bitrate,
             sample_rate=settings.sample_rate,
         )
         validate_audio(
-            produced_path,
+            aac_path,
             expected_codec="aac",
             expected_sample_rate=settings.sample_rate,
         )
-    else:
-        output_filename = sanitize_filename(chapter.title, chapter_index)
-        produced_path = output_dir / output_filename
-        encode_mp3(
-            encode_src,
-            produced_path,
-            bitrate=settings.bitrate,
-            sample_rate=settings.sample_rate,
-        )
-        validate_mp3(produced_path, expected_sample_rate=settings.sample_rate)
+
+    # ChapterResult.output_path = MP3 when present, else AAC (pure-m4b).
+    produced_path = mp3_path if mp3_path is not None else aac_path
 
     # ------------------------------------------------------------------ #
     # Probe the produced file for its real duration                        #
     # ------------------------------------------------------------------ #
+    probe_target = mp3_path if mp3_path is not None else aac_path
     try:
-        duration_seconds = probe_duration(produced_path)
+        duration_seconds = probe_duration(probe_target) if probe_target is not None else 0.0
     except Exception as exc:
         log.warning("Chapter %r: duration probe failed: %s", chapter.chapter_id, exc)
         duration_seconds = 0.0
@@ -378,8 +424,6 @@ def _process_chapter(
     # Cleanup intermediate files (only on success, unless keep_intermediates)
     # ------------------------------------------------------------------ #
     if not settings.keep_intermediates:
-        # Remove just the non-segment intermediate files (chapter WAV, normalized WAV)
-        # Segment WAVs are cleaned up at the top level after all chapters succeed.
         for tmp_file in [chapter_wav, chapter_wav_norm]:
             if tmp_file.exists():
                 tmp_file.unlink(missing_ok=True)
@@ -423,7 +467,7 @@ def convert_epub(
     epub_path: Path,
     output_dir: Path,
     settings: Settings,
-    tts_engine: TTSEngine,
+    provider: NarrationProvider,
     plan: ConversionPlan | None = None,
 ) -> ConversionReport:
     """Convert an EPUB to MP3 audiobook files.
@@ -434,25 +478,31 @@ def convert_epub(
     2. Write the manifest before synthesis begins.
     3. For each chapter (in reading order):
        a. Extract and clean text.
-       b. Normalize and segment text.
-       c. Synthesize each segment (skipping cached segments on resume).
+       b. Run the Narration Director to produce a
+          :class:`~epub2audio.models.NarrationPlan` per scene.
+       c. For each narration segment: call
+          :meth:`~epub2audio.providers.base.NarrationProvider.render` then
+          :meth:`~epub2audio.providers.base.NarrationProvider.synthesize`
+          (skipping cached segments on resume).
        d. Concatenate segment WAVs.
        e. Optionally normalize loudness (EBU R128).
-       f. Encode to MP3 (libmp3lame, mono, 24 kHz by default).
-       g. Embed ID3 metadata and cover art.
+       f. Encode to MP3 (libmp3lame, mono, 24 kHz by default) or per-chapter
+          AAC (for M4B assembly).
+       g. Embed ID3 metadata and cover art (MP3 only).
        h. Validate via FFprobe.
        i. Clean up intermediate WAV files.
-    4. Update manifest after each chapter.
-    5. Return a :class:`ConversionReport`.
+    4. For M4B: mux all per-chapter AAC files into a single ``.m4b``.
+    5. Update manifest after each chapter.
+    6. Return a :class:`ConversionReport`.
 
     Args:
         epub_path: Path to the source EPUB file.
-        output_dir: Directory where MP3 files will be written.  Created if
+        output_dir: Directory where output files will be written.  Created if
             it does not exist.
         settings: Effective settings for this conversion run.
-        tts_engine: The TTS engine to use for synthesis.  Must satisfy the
-            :class:`~epub2audio.tts.base.TTSEngine` Protocol.  This module
-            never imports a concrete engine class.
+        provider: The :class:`~epub2audio.providers.base.NarrationProvider`
+            to use for synthesis.  Must satisfy the ``NarrationProvider``
+            Protocol.  This module never imports a concrete provider class.
         plan: Optional pre-built :class:`ConversionPlan`.  If ``None``, the
             plan is built from the EPUB at *epub_path*.
 
@@ -481,6 +531,19 @@ def convert_epub(
     # Extract cover art once for all chapters
     book = open_epub(epub_path)
     cover_bytes = extract_cover(book)
+
+    # Build the effective lexicon once: bundled defaults (unless disabled)
+    # overlaid with the user's dictionary (user entries win).
+    lexicon = build_lexicon(
+        settings.pronunciation_dictionary,
+        include_defaults=settings.use_default_pronunciations,
+    )
+    log.info(
+        "Pronunciation lexicon: %d term(s) (defaults=%s, user dict=%s).",
+        len(lexicon),
+        settings.use_default_pronunciations,
+        settings.pronunciation_dictionary or "none",
+    )
 
     # ------------------------------------------------------------------ #
     # Manifest: load existing or create fresh                              #
@@ -559,7 +622,8 @@ def convert_epub(
                 output_dir=output_dir,
                 work_root=work_root,
                 settings=settings,
-                tts_engine=tts_engine,
+                provider=provider,
+                lexicon=lexicon,
                 manifest=manifest,
                 cover_bytes=cover_bytes,
             )
@@ -569,32 +633,32 @@ def convert_epub(
 
             # Metadata: MP3 gets per-file ID3 tags + cover embedded now.
             # For M4B the tags/chapters/cover are applied once in the final mux.
-            if result.output_path is not None:
-                if settings.output_format == "mp3":
-                    mp3_path = Path(result.output_path)
-                    try:
-                        embed_metadata(
-                            mp3_path=mp3_path,
-                            metadata=book_metadata,
-                            track_number=idx,
-                            total_tracks=total_chapters,
-                            chapter_title=chapter.title,
-                            cover_bytes=cover_bytes,
-                        )
-                    except Exception as meta_exc:
-                        log.warning(
-                            "Chapter %r: metadata embedding failed: %s",
-                            chapter.chapter_id,
-                            meta_exc,
-                        )
-                        result = ChapterResult(
-                            chapter_id=result.chapter_id,
-                            duration_seconds=result.duration_seconds,
-                            warnings=[*result.warnings, f"Metadata embedding failed: {meta_exc}"],
-                            output_path=result.output_path,
-                        )
+            if result.output_path is not None and settings.output_format in ("mp3", "both"):
+                mp3_embed_path = Path(result.output_path)
+                try:
+                    embed_metadata(
+                        mp3_path=mp3_embed_path,
+                        metadata=book_metadata,
+                        track_number=idx,
+                        total_tracks=total_chapters,
+                        chapter_title=chapter.title,
+                        cover_bytes=cover_bytes,
+                    )
+                except Exception as meta_exc:
+                    log.warning(
+                        "Chapter %r: metadata embedding failed: %s",
+                        chapter.chapter_id,
+                        meta_exc,
+                    )
+                    result = ChapterResult(
+                        chapter_id=result.chapter_id,
+                        duration_seconds=result.duration_seconds,
+                        warnings=[*result.warnings, f"Metadata embedding failed: {meta_exc}"],
+                        output_path=result.output_path,
+                    )
 
-                successful_chapter_ids.append(chapter.chapter_id)
+            # Mark chapter successful regardless of output_format.
+            successful_chapter_ids.append(chapter.chapter_id)
 
         except Exception as exc:
             log.error("Chapter %r failed: %s", chapter.chapter_id, exc)
@@ -626,13 +690,23 @@ def convert_epub(
     # M4B assembly: mux per-chapter AAC segments into one .m4b            #
     # (must run before work-dir cleanup, which removes the segments).      #
     # ------------------------------------------------------------------ #
+    needs_m4b_assembly = settings.output_format in ("m4b", "both")
     m4b_output_path: str | None = None
     m4b_markers: list[ChapterMarker] = []
-    if settings.output_format == "m4b":
+    if needs_m4b_assembly:
         chapter_audio: list[Path] = []
         cursor_ms = 0
         for chapter, result in zip(chapters, chapter_results, strict=True):
-            if result.output_path is None:
+            # In both-mode the work-dir AAC is the mux source (result.output_path
+            # is the MP3); in pure-m4b mode it is also the work-dir AAC.  Always
+            # derive the path from the deterministic work-dir location.
+            aac_src = work_root / chapter.chapter_id / "chapter.m4a"
+            if not aac_src.exists():
+                log.warning(
+                    "Chapter %r: AAC mux source not found at %s — skipping in M4B.",
+                    chapter.chapter_id,
+                    aac_src,
+                )
                 continue
             start_ms = cursor_ms
             end_ms = start_ms + round(result.duration_seconds * 1000)
@@ -644,7 +718,7 @@ def convert_epub(
                     end_ms=end_ms,
                 )
             )
-            chapter_audio.append(Path(result.output_path))
+            chapter_audio.append(aac_src)
             cursor_ms = end_ms
 
         if chapter_audio:
@@ -673,29 +747,28 @@ def convert_epub(
                 # Leave the work dir intact so --resume can retry the mux.
                 successful_chapter_ids = []
 
-        # Audio now lives inside the single .m4b; per-chapter files do not exist.
-        chapter_results = [
-            ChapterResult(
-                chapter_id=r.chapter_id,
-                duration_seconds=r.duration_seconds,
-                warnings=r.warnings,
-                output_path=None,
-            )
-            for r in chapter_results
-        ]
+        # Pure-m4b: audio lives inside the single .m4b; per-chapter paths are None.
+        # both: keep per-chapter MP3 output_paths; the report also carries the M4B.
+        if settings.output_format == "m4b":
+            chapter_results = [
+                ChapterResult(
+                    chapter_id=r.chapter_id,
+                    duration_seconds=r.duration_seconds,
+                    warnings=r.warnings,
+                    output_path=None,
+                )
+                for r in chapter_results
+            ]
 
     # ------------------------------------------------------------------ #
     # Post-run cleanup of persistent work dirs                             #
     # ------------------------------------------------------------------ #
     if not settings.keep_intermediates:
-        # Only clean up chapters that fully succeeded — leave failed chapters'
-        # segment WAVs in place so a subsequent --resume run can reuse them.
         for chapter_id in successful_chapter_ids:
             chapter_work = work_root / chapter_id
             if chapter_work.exists():
                 shutil.rmtree(chapter_work, ignore_errors=True)
 
-        # If all chapters succeeded, remove the work root entirely.
         if len(successful_chapter_ids) == total_chapters:
             try:
                 shutil.rmtree(work_root, ignore_errors=True)
