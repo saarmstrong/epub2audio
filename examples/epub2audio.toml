@@ -13,9 +13,10 @@
 # The TTS provider to use. Currently only "kokoro" is supported.
 provider = "kokoro"
 
-# Voice identifier. Available voices: af_heart, af_sky, af_alloy, af_aoede,
-# af_bella, af_jessica, af_nicole, am_adam, am_michael
-# (run `epub2audio voices` to see all).
+# Voice identifier. Run `epub2audio voices` for the full catalogue (with
+# quality grades). Any voice your installed Kokoro version ships is accepted.
+# For a William Gibson / cyberpunk-noir feel, try: am_onyx (deep American
+# narrator), am_fenrir (gritty), or bm_george (cool British noir).
 voice = "af_heart"
 
 # BCP-47 language tag.
