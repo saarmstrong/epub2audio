@@ -43,6 +43,38 @@ class TestSuperscriptAndNoteStripping:
         assert "the website" in out
 
 
+class TestInlineMerging:
+    """Drop-cap / small-caps openings must not be split into separate words."""
+
+    def test_dropcap_smallcaps_opening_not_split(self) -> None:
+        # The Neuromancer opening: 'T' drop cap + 'HE SKY ABOVE' small-caps.
+        # Must read 'THE SKY ABOVE ...', never 'T HE ...' (which a TTS says as
+        # 'Tee-hee').
+        html = (
+            b'<html><body><p><span class="sans"><span>T</span>'
+            b'<span class="smallcap"><span>HE SKY ABOVE</span></span></span>'
+            b"<span> the port was grey.</span></p></body></html>"
+        )
+        out = xhtml_to_text(html)
+        assert out == "THE SKY ABOVE the port was grey."
+        assert "T HE" not in out
+
+    def test_adjacent_inline_spans_merge_without_space(self) -> None:
+        html = b"<html><body><p>wo<span>rd</span>smith</p></body></html>"
+        assert xhtml_to_text(html) == "wordsmith"
+
+    def test_real_word_spacing_preserved(self) -> None:
+        html = b"<html><body><p>the <em>quick</em> brown fox</p></body></html>"
+        assert xhtml_to_text(html) == "the quick brown fox"
+
+    def test_link_text_preserved_after_unwrap(self) -> None:
+        html = (
+            b"<html><body><p>Visit "
+            b'<a href="https://example.com">the website</a> now.</p></body></html>'
+        )
+        assert xhtml_to_text(html) == "Visit the website now."
+
+
 class TestHardFrontMatterTitles:
     def test_definitive_titles_excluded(self) -> None:
         for t in [

@@ -55,6 +55,47 @@ def _is_note_href(href: str) -> bool:
     return bool(_NOTE_HREF_RE.search(href))
 
 
+# Inline formatting tags whose text belongs to the surrounding word/flow.  These
+# are unwrapped (replaced by their contents) BEFORE text extraction so that a
+# drop-cap or small-caps opening such as
+# ``<span>T</span><span class="smallcap">HE SKY</span>`` merges back into
+# ``THE SKY`` instead of being split into ``T HE SKY`` (which a TTS reads as
+# "Tee-hee").  Block/semantic elements are intentionally excluded.
+_INLINE_TAGS: frozenset[str] = frozenset(
+    {
+        "span",
+        "a",
+        "b",
+        "i",
+        "em",
+        "strong",
+        "small",
+        "sub",
+        "sup",
+        "u",
+        "mark",
+        "cite",
+        "abbr",
+        "q",
+        "font",
+        "tt",
+        "big",
+        "s",
+        "strike",
+        "var",
+        "kbd",
+        "samp",
+        "time",
+        "bdi",
+        "bdo",
+        "ins",
+        "del",
+        "wbr",
+        "nobr",
+    }
+)
+
+
 def _extract_fragment(
     body: bs4.Tag,
     start_fragment: str,
@@ -201,6 +242,16 @@ def xhtml_to_text(
     for sup in body.find_all("sup"):
         if sup.find("a") is not None or _is_marker_text(sup.get_text()):
             sup.decompose()
+
+    # 3c. Merge inline formatting elements into the surrounding text flow.
+    #     Unwrapping replaces e.g. ``<span>T</span><span>HE</span>`` with the
+    #     bare strings ``T`` and ``HE``; ``smooth()`` then consolidates adjacent
+    #     strings into ``THE`` so drop-cap / small-caps openings are not split
+    #     into separate "words" during extraction.  Runs after note/sup removal
+    #     so those markers are gone before the merge.
+    for tag in body.find_all(list(_INLINE_TAGS)):
+        tag.unwrap()
+    body.smooth()
 
     # 4. Replace <br> with newline placeholder before text extraction.
     for br in body.find_all("br"):
