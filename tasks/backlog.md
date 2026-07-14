@@ -181,3 +181,89 @@ _Carry-forward from M11 review (non-blocking):_
 - [x] `M12-07` — Validation: flag a `None` M4B `output_path` as `missing_output_file` when chapters exist (currently only caught indirectly via `report.errors`)
 - [x] `M12-08` — Tests: broaden the `validation/` AST import-boundary test to cover `import x` statements and `__init__.py` (not just `ImportFrom` in `checks.py`)
 - [x] `M12-09` — Consider a `model_validator` on `ValidationReport` to prevent count drift on externally-constructed/deserialized reports (or document the ADR-006 tradeoff explicitly)
+
+---
+
+## Milestones 13–16 — Proposed (not yet committed)
+
+_Sourced from a feature comparison against [abogen](https://github.com/denizsafak/abogen)
+and [TTS-Story](https://github.com/Xerophayze/TTS-Story). Full rationale, fit
+assessment, and rejected candidates are in [docs/roadmap.md](../docs/roadmap.md) —
+read it before starting any task below. Ranked 1 (highest value/effort) to 7._
+
+### Milestone 13 — Per-Character Voices + Voice Presets (rank 1–2)
+
+_Design note: `voice_map` and `custom_*` voice resolution belong in the
+provider/`tts` layer, not `director/` — the Director must stay provider-neutral
+per ADR-003. Write a decision record if the config shape is non-obvious._
+
+- [ ] `M13-01` — Architect: design `voice_map` config shape (TOML table,
+      speaker name → voice id) and where it's resolved (provider boundary);
+      decision record if non-trivial
+- [ ] `M13-02` — TTS Engineer: `providers/kokoro.py` — resolve
+      `NarrationSegment.speaker` to a mapped voice, fall back to default
+      `--voice` for unmapped/`"unknown"` speakers
+- [ ] `M13-03` — Tester: unit tests for voice-map resolution + fallback; no
+      change to speaker detection itself (reuse M8 heuristics)
+- [ ] `M13-04` — Audio/Validation: extend `validation/` to flag speakers with
+      no voice mapping and no fallback as a `ValidationIssue` (not silent)
+- [ ] `M13-05` — TTS Engineer: `tts/voices.py` — parse `custom_<name> =
+      "af_heart:0.6,af_bella:0.4"` config entries into resolved Kokoro voice
+      blends
+- [ ] `M13-06` — CLI: `voices` command lists custom presets alongside built-in
+      voices; `--sample custom_<name>` reuses existing sample-generation path
+- [ ] `M13-07` — TTS Engineer: validate blend weights + referenced base voices
+      exist, reusing `UnknownVoiceError`
+- [ ] `M13-08` — Reviewer: verify Director stays provider-neutral (no
+      speaker/voice-map leakage outside `providers/`), voice-map fallback and
+      blend validation both covered by tests
+
+### Milestone 14 — Subtitles + GPU Backend Detection (rank 3–4)
+
+- [ ] `M14-01` — Audio Engineer: `audio/subtitles.py` — write SRT/VTT from
+      existing per-segment `TextSegment.audio_duration` data; one file per
+      chapter (MP3 mode) or one for the book (M4B mode)
+- [ ] `M14-02` — CLI: `--subtitle-format {none,srt,vtt}` on `convert`
+      (default `none`)
+- [ ] `M14-03` — Tester: subtitle-timing tests against known segment durations
+- [ ] `M14-04` — Reliability Specialist: `doctor` — detect available
+      acceleration backend (MPS / CUDA / CPU); report without changing
+      CPU-only exit-code semantics
+- [ ] `M14-05` — TTS Engineer: `tts/kokoro.py` — pass through explicit device
+      selection when the installed `kokoro`/`torch` build supports it; log and
+      fall back to CPU if unavailable, never fail silently
+- [ ] `M14-06` — Reviewer: verify CPU-only environments are unaffected
+      (Apple Silicon / Intel macOS / Linux priority order unchanged)
+
+### Milestone 15 — Plain-Text Input + Batch Mode (rank 5–6)
+
+- [ ] `M15-01` — Architect: define a format-agnostic reader interface
+      alongside `epub/reader.py` (does not reuse EPUB spine/TOC/NCX scoring)
+- [ ] `M15-02` — EPUB/Text Specialist: `.txt`/`.md` reader; chapter boundaries
+      from explicit markers first, heading-pattern fallback (reuse title
+      patterns from `epub/chapters.py`, not EPUB-specific scoring)
+- [ ] `M15-03` — Document as a known limitation: no front/back-matter
+      classification for non-EPUB input (no semantic types available)
+- [ ] `M15-04` — Tester: fixtures + tests for marker-based and heading-fallback
+      chapter detection on plain text
+- [ ] `M15-05` — CLI: accept multiple/glob input paths on `convert` for
+      sequential batch conversion (no new subcommand)
+- [ ] `M15-06` — Reliability Specialist: aggregate Rich progress across a
+      multi-book run; each book keeps its own manifest/resume state unchanged
+- [ ] `M15-07` — Reviewer: verify batch mode doesn't violate the
+      single-worker-TTS default and per-book resume is unaffected
+
+### Milestone 16 — Local Voice-Cloning Provider (rank 7, stretch)
+
+- [ ] `M16-01` — Architect: pick one candidate engine (e.g. Chatterbox/VoxCPM/
+      IndexTTS) and verify it is fully offline-capable after model download —
+      same network bar as Kokoro — before any implementation starts
+- [ ] `M16-02` — TTS Engineer: new `providers/<engine>.py` implementing
+      `NarrationProvider` (first real non-Kokoro adapter; existing stubs in
+      `providers/{openai,gemini,azure,elevenlabs}.py` establish the shape)
+- [ ] `M16-03` — TTS Engineer: local reference-sample storage (a config-pointed
+      directory, not a managed service)
+- [ ] `M16-04` — Tester: adapter unit tests + boundary test (no cross-layer
+      imports, matching the M9-05 pattern)
+- [ ] `M16-05` — Reviewer: verify no network calls occur during synthesis;
+      verify adding this provider required no `director/`/pipeline edits

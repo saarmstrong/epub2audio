@@ -9,6 +9,13 @@ _Last updated: 2026-07-13 (M12 final reconciliation + Feature.md deliverables �
 **Milestones 8–12** — Full `Feature.md` narration pipeline — ✅ Complete
 (independent Reviewer sign-off on each milestone).
 
+**Milestones 13–16 — proposed, not started.** Ranked feature candidates sourced
+from a comparison against abogen and TTS-Story (per-character voices, voice
+presets, subtitles, GPU detection, plain-text input, batch mode, local
+voice-cloning provider). See [docs/roadmap.md](roadmap.md) for rationale and
+fit assessment, and `tasks/backlog.md` (Milestones 13–16) for the task
+breakdown.
+
 **All Feature.md deliverables satisfied (Reviewer-verified 2026-07-13):**
 1. Refactored architecture (additive three-layer Director → Provider → Engine)
 2. Working MP3 output (unchanged; per-chapter MP3s with ID3 + cover)
