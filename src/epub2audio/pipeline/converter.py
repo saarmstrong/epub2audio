@@ -75,7 +75,7 @@ from epub2audio.pipeline.resume import (
     segment_needs_synthesis,
     tts_config_changed,
 )
-from epub2audio.pronunciation import PronunciationLexicon, load_lexicon
+from epub2audio.pronunciation import PronunciationLexicon, build_lexicon
 from epub2audio.providers.base import NarrationProvider
 from epub2audio.text.normalize import normalize_text
 from epub2audio.utils.names import sanitize_book_filename, sanitize_filename
@@ -532,13 +532,18 @@ def convert_epub(
     book = open_epub(epub_path)
     cover_bytes = extract_cover(book)
 
-    # Load the pronunciation lexicon once (empty when none is configured).
-    lexicon = load_lexicon(settings.pronunciation_dictionary)
-    if settings.pronunciation_dictionary is not None:
-        log.info(
-            "Loaded pronunciation dictionary from %s.",
-            settings.pronunciation_dictionary,
-        )
+    # Build the effective lexicon once: bundled defaults (unless disabled)
+    # overlaid with the user's dictionary (user entries win).
+    lexicon = build_lexicon(
+        settings.pronunciation_dictionary,
+        include_defaults=settings.use_default_pronunciations,
+    )
+    log.info(
+        "Pronunciation lexicon: %d term(s) (defaults=%s, user dict=%s).",
+        len(lexicon),
+        settings.use_default_pronunciations,
+        settings.pronunciation_dictionary or "none",
+    )
 
     # ------------------------------------------------------------------ #
     # Manifest: load existing or create fresh                              #

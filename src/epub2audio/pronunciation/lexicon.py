@@ -40,12 +40,17 @@ own G2P handling; the Kokoro adapter simply skips it).
 from __future__ import annotations
 
 import re
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from epub2audio.models import PronunciationHint
+
+# Package + filename of the bundled default dictionary.
+_DEFAULT_DATA_PACKAGE = "epub2audio.pronunciation.data"
+_DEFAULT_DATA_FILE = "default_pronunciations.yaml"
 
 
 class PronunciationEntry:
@@ -147,6 +152,27 @@ class PronunciationLexicon:
             A new, empty :class:`PronunciationLexicon`.
         """
         return cls({})
+
+    def merged(self, other: PronunciationLexicon) -> PronunciationLexicon:
+        """Return a new lexicon with *other*'s entries layered over this one.
+
+        Entries in *other* take precedence: when both lexicons define the same
+        term, *other*'s wins.  Used to overlay a user's ``pronunciation_dictionary``
+        on top of the bundled defaults.
+
+        Args:
+            other: The higher-precedence lexicon (its entries override).
+
+        Returns:
+            A new :class:`PronunciationLexicon` containing the union of terms.
+        """
+        combined = dict(self._entries)
+        combined.update(other._entries)
+        return PronunciationLexicon(combined)
+
+    def __len__(self) -> int:
+        """Return the number of terms in the lexicon."""
+        return len(self._entries)
 
     def lookup(self, term: str) -> PronunciationEntry | None:
         """Return the entry for *term*, or ``None`` if not in the lexicon.
@@ -295,9 +321,29 @@ def load_lexicon(path: Path | None) -> PronunciationLexicon:
     except yaml.YAMLError as exc:
         raise ValueError(f"Could not parse pronunciation dictionary at {path}: {exc}") from exc
 
+    return PronunciationLexicon(_entries_from_data(data, str(path)))
+
+
+def _entries_from_data(data: Any, source: str) -> dict[str, PronunciationEntry]:
+    """Build the term→entry mapping from already-parsed YAML *data*.
+
+    Shared by :func:`load_lexicon` (user files) and :func:`load_default_lexicon`
+    (the bundled dictionary).  Supports all documented YAML forms.
+
+    Args:
+        data: The object returned by ``yaml.safe_load`` (mapping, list, or None).
+        source: Human-readable source label used in error messages.
+
+    Returns:
+        A mapping of term string to :class:`PronunciationEntry` (empty for
+        ``None``/empty input).
+
+    Raises:
+        ValueError: If *data* is not a mapping or list, or an entry has an
+            unsupported value type.
+    """
     if data is None:
-        # Empty YAML file.
-        return PronunciationLexicon.empty()
+        return {}
 
     entries: dict[str, PronunciationEntry] = {}
 
@@ -305,7 +351,7 @@ def load_lexicon(path: Path | None) -> PronunciationLexicon:
     if isinstance(data, dict) and set(data.keys()) == {"pronunciations"}:
         data = data["pronunciations"]
         if data is None:
-            return PronunciationLexicon.empty()
+            return {}
 
     # Form 4 — bare list of term strings
     if isinstance(data, list):
@@ -316,16 +362,60 @@ def load_lexicon(path: Path | None) -> PronunciationLexicon:
                     f"{type(item).__name__!r}: {item!r}"
                 )
             entries[item] = PronunciationEntry(term=item)
-        return PronunciationLexicon(entries)
+        return entries
 
     # Forms 1 & 2 — top-level mapping
     if isinstance(data, dict):
         for term, value in data.items():
             term_str = str(term)
             entries[term_str] = _parse_entry(term_str, value)
-        return PronunciationLexicon(entries)
+        return entries
 
     raise ValueError(
-        f"Pronunciation dictionary at {path} must be a YAML mapping or list, "
+        f"Pronunciation dictionary at {source} must be a YAML mapping or list, "
         f"got {type(data).__name__!r}."
     )
+
+
+def load_default_lexicon() -> PronunciationLexicon:
+    """Load the bundled default pronunciation dictionary.
+
+    Reads ``default_pronunciations.yaml`` shipped inside the package (a curated
+    set of commonly mispronounced words with unambiguous pronunciations).
+
+    Returns:
+        The default :class:`PronunciationLexicon`.
+    """
+    raw = (
+        resources.files(_DEFAULT_DATA_PACKAGE)
+        .joinpath(_DEFAULT_DATA_FILE)
+        .read_text(encoding="utf-8")
+    )
+    data = yaml.safe_load(raw)
+    return PronunciationLexicon(_entries_from_data(data, "built-in default dictionary"))
+
+
+def build_lexicon(
+    user_path: Path | None,
+    *,
+    include_defaults: bool = True,
+) -> PronunciationLexicon:
+    """Build the effective lexicon: bundled defaults overlaid with the user file.
+
+    This is the entry point the pipeline uses.  The bundled default dictionary
+    is loaded first (when *include_defaults*), then the user's
+    ``pronunciation_dictionary`` is layered on top so user entries override any
+    default with the same term.
+
+    Args:
+        user_path: Path to the user's ``pronunciations.yaml``, or ``None``.
+        include_defaults: When ``True`` (default), start from the bundled
+            default dictionary; when ``False``, start empty.
+
+    Returns:
+        The merged :class:`PronunciationLexicon` (possibly empty).
+    """
+    base = load_default_lexicon() if include_defaults else PronunciationLexicon.empty()
+    if user_path is None:
+        return base
+    return base.merged(load_lexicon(user_path))

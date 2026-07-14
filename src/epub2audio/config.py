@@ -101,6 +101,14 @@ class Settings(BaseSettings):
         default=None,
         description="Path to a pronunciations.yaml lexicon, or None to disable.",
     )
+    use_default_pronunciations: bool = Field(
+        default=True,
+        description=(
+            "Load the bundled default pronunciation dictionary of commonly "
+            "mispronounced words. User entries in 'pronunciation_dictionary' "
+            "override built-in defaults with the same term."
+        ),
+    )
 
     @field_validator("output_format", mode="before")
     @classmethod

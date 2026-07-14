@@ -57,8 +57,14 @@ scene_analysis = true
 # ---------------------------------------------------------------------------
 # Pronunciation dictionary
 # ---------------------------------------------------------------------------
-# Path to a YAML file mapping terms to IPA / respellings.
-# See examples/pronunciations.yaml for the format.
+# Load the bundled default dictionary of commonly mispronounced words
+# (titles like "Mr"/"Mrs", loanwords like "genre"/"facade", etc.). Your own
+# entries below override any default with the same term. Set to false to
+# disable the built-in defaults entirely.
+use_default_pronunciations = true
+
+# Path to a YAML file mapping terms to IPA / respellings. Merged on top of the
+# built-in defaults (your entries win). See examples/pronunciations.yaml.
 # [optional — uncomment and set a path to enable]
 # pronunciation_dictionary = "pronunciations.yaml"
 

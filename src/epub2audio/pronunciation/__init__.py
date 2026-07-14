@@ -23,7 +23,15 @@ from __future__ import annotations
 from epub2audio.pronunciation.lexicon import (
     PronunciationEntry,
     PronunciationLexicon,
+    build_lexicon,
+    load_default_lexicon,
     load_lexicon,
 )
 
-__all__ = ["PronunciationEntry", "PronunciationLexicon", "load_lexicon"]
+__all__ = [
+    "PronunciationEntry",
+    "PronunciationLexicon",
+    "build_lexicon",
+    "load_default_lexicon",
+    "load_lexicon",
+]
